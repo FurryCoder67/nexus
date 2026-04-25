@@ -1040,6 +1040,206 @@ function idleDraw() {
 }
 idleDraw();
 </script>
+<script src="../nexus-config.js"></script>
+<script src="../nexus-mp.js"></script>
+<script>
+// ── CURSED ARENA MULTIPLAYER — Co-op Mode ─────────────────────────────────────
+// Both players fight the same wave. Enemies have shared HP pool.
+// Scores are combined on the leaderboard.
+(function(){
+  const GAME_ID = 'cursed-arena';
+  let mpActive = false, opponentData = null;
+
+  // ── Shared enemy HP pool ──────────────────────────────────────────────────
+  // When we hit an enemy, broadcast the damage. When we receive damage from
+  // opponent, apply it to our local enemy with matching id.
+  const _origSpawnEnemy = window.spawnEnemy;
+  let _enemyIdCounter = 0;
+  window.spawnEnemy = function(type) {
+    _origSpawnEnemy(type);
+    // Tag the last spawned enemy with a shared id
+    const e = state.enemies[state.enemies.length - 1];
+    if (e) e.mpId = `e_${++_enemyIdCounter}`;
+  };
+
+  // Patch the damage/kill logic to broadcast
+  const _origKillEnemy = window.killEnemy;
+  window.killEnemy = function(e) {
+    if (mpActive && e.mpId) {
+      NexusMP.send('kill/' + e.mpId, { killer: NexusMP.myId, ts: Date.now() });
+    }
+    _origKillEnemy(e);
+  };
+
+  // Listen for opponent kills — remove matching enemy
+  function onOpponentKill(mpId) {
+    const idx = state.enemies.findIndex(e => e.mpId === mpId);
+    if (idx !== -1) {
+      const e = state.enemies[idx];
+      state.enemies.splice(idx, 1);
+      state.enemiesLeft = Math.max(0, state.enemiesLeft - 1);
+      spawnParticles(e.x, e.y, e.color, 12);
+    }
+  }
+
+  // ── Multiplayer UI ────────────────────────────────────────────────────────
+  const panel = document.createElement('div');
+  panel.id = 'mp-panel';
+  panel.innerHTML = `
+    <style>
+      #mp-panel{position:fixed;top:52px;right:12px;z-index:4000;width:220px;font-family:'Courier New',monospace;}
+      #mp-toggle{background:rgba(168,85,247,.85);border:none;border-radius:6px;padding:6px 14px;color:#fff;font-size:.72rem;font-weight:700;letter-spacing:.1em;cursor:pointer;width:100%;margin-bottom:5px;}
+      #mp-box{background:rgba(0,0,0,.95);border:1px solid #4a1a6a;border-radius:8px;padding:12px;display:none;}
+      #mp-box.open{display:block;}
+      .mp-label{font-size:.6rem;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#888;margin-bottom:3px;}
+      .mp-input{width:100%;background:rgba(255,255,255,.06);border:1px solid #4a1a6a;border-radius:4px;padding:5px 8px;color:#fff;font-size:.75rem;margin-bottom:7px;outline:none;font-family:inherit;}
+      .mp-btn{width:100%;padding:7px;border-radius:5px;border:none;font-size:.7rem;font-weight:700;cursor:pointer;margin-bottom:5px;letter-spacing:.08em;font-family:inherit;}
+      .mp-btn-host{background:linear-gradient(135deg,#a855f7,#7c3aed);color:#fff;}
+      .mp-btn-join{background:rgba(168,85,247,.15);border:1px solid #4a1a6a;color:#c084fc;}
+      .mp-status{font-size:.68rem;color:#888;text-align:center;margin-top:3px;}
+      .mp-code{font-size:1.1rem;font-weight:900;color:#a855f7;text-align:center;letter-spacing:.2em;padding:5px;background:rgba(168,85,247,.1);border-radius:4px;margin:5px 0;}
+      .mp-player-row{display:flex;align-items:center;gap:5px;padding:3px 0;font-size:.7rem;color:#e2e8ff;}
+      .mp-dot{width:6px;height:6px;border-radius:50%;background:#22c55e;flex-shrink:0;}
+      .mp-dot.opp{background:#a855f7;}
+      #mp-opp-hud{position:fixed;top:60px;left:60px;z-index:3000;background:rgba(0,0,0,.8);border:1px solid #4a1a6a;border-radius:6px;padding:8px 12px;font-family:'Courier New',monospace;font-size:.7rem;color:#e2e8ff;display:none;}
+      #mp-opp-hud.visible{display:block;}
+    </style>
+    <button id="mp-toggle">⚡ CO-OP</button>
+    <div id="mp-box">
+      <div class="mp-label">Your Name</div>
+      <input class="mp-input" id="mp-name" placeholder="Sorcerer" maxlength="16" value="${window.NEXUS_PLAYER_NAME||'Sorcerer'}">
+      <button class="mp-btn mp-btn-host" id="mp-host-btn">🤝 HOST CO-OP</button>
+      <div class="mp-label">Join with code</div>
+      <input class="mp-input" id="mp-code-input" placeholder="ABC123" maxlength="6" style="text-transform:uppercase;letter-spacing:.12em;">
+      <button class="mp-btn mp-btn-join" id="mp-join-btn">→ JOIN</button>
+      <div class="mp-status" id="mp-status">Not connected</div>
+      <div id="mp-players"></div>
+    </div>
+    <div id="mp-opp-hud">
+      <div style="color:#a855f7;font-weight:700;margin-bottom:4px;">ALLY</div>
+      <div>HP: <span id="opp-hp" style="color:#ef4444">—</span></div>
+      <div>SCORE: <span id="opp-score" style="color:#ffcc00">—</span></div>
+      <div>WAVE: <span id="opp-wave" style="color:#a855f7">—</span></div>
+    </div>
+  `;
+  document.body.appendChild(panel);
+
+  document.getElementById('mp-toggle').onclick = () => document.getElementById('mp-box').classList.toggle('open');
+
+  function setStatus(msg, color) {
+    const el = document.getElementById('mp-status');
+    el.textContent = msg; el.style.color = color || '#888';
+  }
+
+  function updatePlayerList() {
+    const el = document.getElementById('mp-players');
+    let html = '';
+    NexusMP.players.forEach((p, id) => {
+      const isMe = id === NexusMP.myId;
+      html += `<div class="mp-player-row"><div class="mp-dot${isMe?'':' opp'}"></div>${p.name}${isMe?' (you)':''}</div>`;
+    });
+    el.innerHTML = html;
+  }
+
+  function onConnected() {
+    mpActive = true;
+    document.getElementById('mp-opp-hud').classList.add('visible');
+    updatePlayerList();
+
+    // Listen for opponent state
+    NexusMP.on('pstate', (data) => {
+      if (!data || data.id === NexusMP.myId) return;
+      opponentData = data;
+      document.getElementById('opp-hp').textContent = Math.round(data.hp || 0);
+      document.getElementById('opp-score').textContent = data.score || 0;
+      document.getElementById('opp-wave').textContent = data.wave || 1;
+    });
+
+    // Listen for opponent kills
+    NexusMP.on('kill', (data) => {
+      if (!data) return;
+      for (const [mpId, killData] of Object.entries(data)) {
+        if (killData && killData.killer !== NexusMP.myId) {
+          onOpponentKill(mpId);
+        }
+      }
+    });
+
+    NexusMP.onPlayerJoin((id, p) => {
+      updatePlayerList();
+      setStatus(`${p.name} joined! Co-op active!`, '#22c55e');
+    });
+    NexusMP.onPlayerLeave((id) => {
+      updatePlayerList();
+      setStatus('Ally disconnected', '#ef4444');
+    });
+  }
+
+  async function hostCoop() {
+    const name = document.getElementById('mp-name').value.trim() || 'Sorcerer';
+    localStorage.setItem('nexus_playername', name);
+    setStatus('Creating room…', '#a855f7');
+    try {
+      const { roomCode } = await NexusMP.init(GAME_ID, name);
+      setStatus('Waiting for ally…', '#22c55e');
+      const codeEl = document.createElement('div');
+      codeEl.className = 'mp-code'; codeEl.textContent = roomCode;
+      document.getElementById('mp-players').before(codeEl);
+      onConnected();
+    } catch(e) { setStatus('Error: ' + e.message, '#ef4444'); }
+  }
+
+  async function joinCoop() {
+    const name = document.getElementById('mp-name').value.trim() || 'Sorcerer';
+    const code = document.getElementById('mp-code-input').value.trim().toUpperCase();
+    if (!code) { setStatus('Enter a room code', '#ef4444'); return; }
+    localStorage.setItem('nexus_playername', name);
+    setStatus('Joining…', '#a855f7');
+    try {
+      await NexusMP.join(GAME_ID, code, name);
+      setStatus('Connected! Co-op active!', '#22c55e');
+      onConnected();
+    } catch(e) { setStatus('Error: ' + e.message, '#ef4444'); }
+  }
+
+  document.getElementById('mp-host-btn').onclick = hostCoop;
+  document.getElementById('mp-join-btn').onclick = joinCoop;
+
+  // ── Broadcast own state every 200ms ──────────────────────────────────────
+  setInterval(() => {
+    if (!mpActive || !state || state.phase !== 'playing') return;
+    NexusMP.send('pstate', {
+      id: NexusMP.myId,
+      hp: state.player.hp,
+      score: state.score,
+      wave: state.wave,
+      x: state.player.x,
+      y: state.player.y,
+      ts: Date.now(),
+    });
+  }, 200);
+
+  // ── Draw opponent on canvas ───────────────────────────────────────────────
+  const _origLoop = window.loop;
+  window.loop = function(ts) {
+    _origLoop(ts);
+    if (!mpActive || !opponentData || !window.canvas) return;
+    const ctx = canvas.getContext('2d');
+    ctx.save();
+    ctx.globalAlpha = 0.6;
+    ctx.beginPath();
+    ctx.arc(opponentData.x || 0, opponentData.y || 0, 14, 0, Math.PI * 2);
+    ctx.fillStyle = '#a855f7';
+    ctx.fill();
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = '#e9d5ff';
+    ctx.font = 'bold 9px Courier New';
+    ctx.textAlign = 'center';
+    ctx.fillText('ALLY', opponentData.x || 0, (opponentData.y || 0) - 18);
+    ctx.restore();
+  };
+})();
+</script>
 <script>(function(){
   var id='cursed-arena';
   var p=parseInt(localStorage.getItem('nexus_plays_'+id)||'0')+1;

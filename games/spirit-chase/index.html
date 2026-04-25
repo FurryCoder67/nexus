@@ -1492,6 +1492,241 @@ showStartBest();
 showScreen('start');
 requestAnimationFrame(gameLoop);
 </script>
+<script src="../nexus-config.js"></script>
+<script src="../nexus-mp.js"></script>
+<script>
+// ── SPIRIT CHASE MULTIPLAYER — Race Mode ──────────────────────────────────────
+// Same maze seed, see opponent ghost in real-time. First to exit wins.
+(function(){
+  const GAME_ID = 'spirit-chase';
+  let mpActive = false, opponentGhost = null, raceStarted = false;
+  let mazeSeed = null;
+
+  // ── Seeded RNG to share maze generation ──────────────────────────────────────
+  function mulberry32(seed) {
+    return function() {
+      seed |= 0; seed = seed + 0x6D2B79F5 | 0;
+      let t = Math.imul(seed ^ seed >>> 15, 1 | seed);
+      t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+      return ((t ^ t >>> 14) >>> 0) / 4294967296;
+    };
+  }
+
+  // Patch Math.random during maze generation to use shared seed
+  const _origRandom = Math.random;
+  let _seededRng = null;
+  function useSeed(seed) {
+    mazeSeed = seed;
+    _seededRng = mulberry32(seed);
+    Math.random = _seededRng;
+  }
+  function restoreRandom() { Math.random = _origRandom; }
+
+  // Patch initRound to use seeded RNG when in MP mode
+  const _origInitRound = window.initRound;
+  window.initRound = function(roundNum) {
+    if (mpActive && mazeSeed !== null) {
+      useSeed(mazeSeed + roundNum * 1000);
+      _origInitRound(roundNum);
+      restoreRandom();
+    } else {
+      _origInitRound(roundNum);
+    }
+  };
+
+  // ── Multiplayer UI ────────────────────────────────────────────────────────────
+  const panel = document.createElement('div');
+  panel.id = 'mp-panel';
+  panel.innerHTML = `
+    <style>
+      #mp-panel{position:fixed;top:56px;right:12px;z-index:4000;width:220px;font-family:'Inter',sans-serif;}
+      #mp-toggle{background:rgba(99,102,241,.9);border:none;border-radius:8px;padding:7px 14px;color:#fff;font-size:.75rem;font-weight:700;letter-spacing:.08em;cursor:pointer;width:100%;margin-bottom:6px;}
+      #mp-box{background:rgba(5,5,20,.95);border:1px solid rgba(99,102,241,.35);border-radius:10px;padding:12px;display:none;backdrop-filter:blur(12px);}
+      #mp-box.open{display:block;}
+      .mp-label{font-size:.65rem;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#94a3b8;margin-bottom:4px;}
+      .mp-input{width:100%;background:rgba(255,255,255,.07);border:1px solid rgba(99,102,241,.3);border-radius:6px;padding:6px 10px;color:#fff;font-size:.8rem;margin-bottom:8px;outline:none;}
+      .mp-btn{width:100%;padding:8px;border-radius:7px;border:none;font-size:.78rem;font-weight:700;cursor:pointer;margin-bottom:6px;letter-spacing:.06em;}
+      .mp-btn-host{background:linear-gradient(135deg,#6366f1,#8b5cf6);color:#fff;}
+      .mp-btn-join{background:rgba(99,102,241,.2);border:1px solid rgba(99,102,241,.4);color:#c7d2fe;}
+      .mp-status{font-size:.72rem;color:#94a3b8;text-align:center;margin-top:4px;}
+      .mp-code{font-family:monospace;font-size:1.1rem;font-weight:900;color:#06b6d4;text-align:center;letter-spacing:.2em;padding:6px;background:rgba(6,182,212,.1);border-radius:6px;margin:6px 0;}
+      .mp-players{margin-top:8px;}
+      .mp-player-row{display:flex;align-items:center;gap:6px;padding:4px 0;font-size:.75rem;color:#e2e8ff;}
+      .mp-dot{width:7px;height:7px;border-radius:50%;background:#10b981;flex-shrink:0;}
+      .mp-dot.ghost{background:#8b5cf6;}
+      #mp-race-banner{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:5000;background:rgba(5,5,20,.97);border:2px solid #06b6d4;border-radius:14px;padding:24px 40px;text-align:center;display:none;font-family:'Inter',sans-serif;}
+      #mp-race-banner h2{font-size:1.6rem;font-weight:900;color:#06b6d4;letter-spacing:.1em;margin-bottom:8px;}
+      #mp-race-banner p{color:#94a3b8;font-size:.85rem;}
+    </style>
+    <button id="mp-toggle">⚡ MULTIPLAYER</button>
+    <div id="mp-box">
+      <div class="mp-label">Your Name</div>
+      <input class="mp-input" id="mp-name" placeholder="Sorcerer" maxlength="16" value="${window.NEXUS_PLAYER_NAME||'Sorcerer'}">
+      <button class="mp-btn mp-btn-host" id="mp-host-btn">🏁 HOST RACE</button>
+      <div class="mp-label">Join with code</div>
+      <input class="mp-input" id="mp-code-input" placeholder="ABC123" maxlength="6" style="text-transform:uppercase;letter-spacing:.15em;">
+      <button class="mp-btn mp-btn-join" id="mp-join-btn">→ JOIN RACE</button>
+      <div class="mp-status" id="mp-status">Not connected</div>
+      <div class="mp-players" id="mp-players"></div>
+    </div>
+    <div id="mp-race-banner">
+      <h2 id="mp-race-title">RACE STARTING</h2>
+      <p id="mp-race-sub">Same maze, first to exit wins!</p>
+    </div>
+  `;
+  document.body.appendChild(panel);
+
+  document.getElementById('mp-toggle').onclick = () => {
+    document.getElementById('mp-box').classList.toggle('open');
+  };
+
+  function setStatus(msg, color) {
+    const el = document.getElementById('mp-status');
+    el.textContent = msg;
+    el.style.color = color || '#94a3b8';
+  }
+
+  function updatePlayerList() {
+    const el = document.getElementById('mp-players');
+    let html = '';
+    NexusMP.players.forEach((p, id) => {
+      const isMe = id === NexusMP.myId;
+      html += `<div class="mp-player-row"><div class="mp-dot${isMe?'':' ghost'}"></div>${p.name}${isMe?' (you)':''}</div>`;
+    });
+    el.innerHTML = html;
+  }
+
+  function showRaceBanner(title, sub, duration) {
+    const b = document.getElementById('mp-race-banner');
+    document.getElementById('mp-race-title').textContent = title;
+    document.getElementById('mp-race-sub').textContent = sub;
+    b.style.display = 'block';
+    if (duration) setTimeout(() => b.style.display = 'none', duration);
+  }
+
+  async function hostRace() {
+    const name = document.getElementById('mp-name').value.trim() || 'Sorcerer';
+    localStorage.setItem('nexus_playername', name);
+    setStatus('Creating room…', '#06b6d4');
+    try {
+      const { roomCode } = await NexusMP.init(GAME_ID, name);
+      mpActive = true;
+      mazeSeed = Date.now() % 999983; // prime-modded seed
+      await NexusMP.set('seed', mazeSeed);
+      setStatus('Waiting for opponent…', '#10b981');
+      document.getElementById('mp-box').innerHTML += `<div class="mp-code">${roomCode}</div><div class="mp-status" style="color:#94a3b8;font-size:.68rem;text-align:center">Share this code!</div>`;
+      updatePlayerList();
+
+      NexusMP.onPlayerJoin((id, p) => {
+        updatePlayerList();
+        setStatus(`${p.name} joined! Starting…`, '#10b981');
+        showRaceBanner('RACE STARTING!', 'Same maze — first to exit wins!', 3000);
+        setTimeout(() => {
+          raceStarted = true;
+          // Restart with shared seed
+          if (typeof startRound === 'function') startRound();
+          else if (typeof initRound === 'function') { round = 1; initRound(1); gameState = 'playing'; }
+        }, 3000);
+      });
+
+      NexusMP.on('opponent', (data) => {
+        if (data && data.id !== NexusMP.myId) opponentGhost = data;
+      });
+      NexusMP.on('result', (data) => {
+        if (data && data.winner && data.winner !== NexusMP.myId) {
+          showRaceBanner('👻 OPPONENT WINS', `${data.winnerName} escaped first!`, 4000);
+        }
+      });
+    } catch(e) {
+      setStatus('Error: ' + e.message, '#ef4444');
+    }
+  }
+
+  async function joinRace() {
+    const name = document.getElementById('mp-name').value.trim() || 'Sorcerer';
+    const code = document.getElementById('mp-code-input').value.trim().toUpperCase();
+    if (!code) { setStatus('Enter a room code', '#ef4444'); return; }
+    localStorage.setItem('nexus_playername', name);
+    setStatus('Joining…', '#06b6d4');
+    try {
+      await NexusMP.join(GAME_ID, code, name);
+      mpActive = true;
+      mazeSeed = await NexusMP.getState('seed');
+      setStatus('Connected! Race starting…', '#10b981');
+      updatePlayerList();
+      showRaceBanner('RACE STARTING!', 'Same maze — first to exit wins!', 3000);
+      setTimeout(() => {
+        raceStarted = true;
+        if (typeof startRound === 'function') startRound();
+        else if (typeof initRound === 'function') { round = 1; initRound(1); gameState = 'playing'; }
+      }, 3000);
+
+      NexusMP.on('opponent', (data) => {
+        if (data && data.id !== NexusMP.myId) opponentGhost = data;
+      });
+      NexusMP.on('result', (data) => {
+        if (data && data.winner && data.winner !== NexusMP.myId) {
+          showRaceBanner('👻 OPPONENT WINS', `${data.winnerName} escaped first!`, 4000);
+        }
+      });
+    } catch(e) {
+      setStatus('Error: ' + e.message, '#ef4444');
+    }
+  }
+
+  document.getElementById('mp-host-btn').onclick = hostRace;
+  document.getElementById('mp-join-btn').onclick = joinRace;
+
+  // ── Broadcast player position every 100ms ─────────────────────────────────
+  setInterval(() => {
+    if (!mpActive || !raceStarted || !window.player) return;
+    NexusMP.send('opponent', {
+      id: NexusMP.myId,
+      x: player.x,
+      y: player.y,
+      round: window.round || 1,
+      ts: Date.now(),
+    });
+  }, 100);
+
+  // ── Draw opponent ghost on canvas ─────────────────────────────────────────
+  const _origGameLoop = window.gameLoop;
+  window.gameLoop = function(now) {
+    _origGameLoop(now);
+    if (mpActive && opponentGhost && window.canvas) {
+      const ctx = canvas.getContext('2d');
+      // Convert world coords to screen (spirit-chase uses direct canvas coords)
+      const gx = opponentGhost.x;
+      const gy = opponentGhost.y;
+      ctx.save();
+      ctx.globalAlpha = 0.55;
+      ctx.beginPath();
+      ctx.arc(gx, gy, 10, 0, Math.PI * 2);
+      ctx.fillStyle = '#8b5cf6';
+      ctx.fill();
+      ctx.globalAlpha = 1;
+      ctx.fillStyle = '#c4b5fd';
+      ctx.font = 'bold 9px Inter';
+      ctx.textAlign = 'center';
+      ctx.fillText('👤', gx, gy - 14);
+      ctx.restore();
+    }
+  };
+
+  // ── Report win ────────────────────────────────────────────────────────────
+  // Hook into the round-over screen to report result
+  const _origShowScreen = window.showScreen;
+  if (_origShowScreen) {
+    window.showScreen = function(name) {
+      _origShowScreen(name);
+      if (name === 'over' && mpActive) {
+        NexusMP.set('result', { winner: NexusMP.myId, winnerName: localStorage.getItem('nexus_playername') || 'Sorcerer' });
+        showRaceBanner('🏆 YOU WIN!', 'You escaped the domain first!', 4000);
+      }
+    };
+  }
+})();
+</script>
 <script>(function(){
   var id='spirit-chase';
   var p=parseInt(localStorage.getItem('nexus_plays_'+id)||'0')+1;

@@ -1470,6 +1470,216 @@ function updateHUD(dt){
 ctx.fillStyle='#030812';
 ctx.fillRect(0,0,canvas.width,canvas.height);
 </script>
+<script src="../nexus-config.js"></script>
+<script src="../nexus-mp.js"></script>
+<script>
+// ── CULLING COLONY MULTIPLAYER — Real-time Battle Royale ──────────────────────
+// Real players join and appear on the map. Host's client simulates bots.
+// Players broadcast position + HP every 50ms. Kills are reported to Firebase.
+(function(){
+  const GAME_ID = 'culling-colony';
+  let mpActive = false;
+  const remotePlayers = new Map(); // id → {x,y,hp,alive,name,techIdx,kills}
+  const COLORS = ['#06b6d4','#f59e0b','#10b981','#ef4444','#a855f7','#ec4899'];
+  let colorIdx = 0;
+
+  // ── Multiplayer UI ────────────────────────────────────────────────────────
+  const panel = document.createElement('div');
+  panel.id = 'mp-panel';
+  panel.innerHTML = `
+    <style>
+      #mp-panel{position:fixed;top:14px;right:120px;z-index:4000;font-family:'Inter',sans-serif;}
+      #mp-toggle{background:rgba(99,102,241,.85);border:none;border-radius:8px;padding:6px 14px;color:#fff;font-size:.72rem;font-weight:700;letter-spacing:.08em;cursor:pointer;}
+      #mp-box{position:absolute;top:36px;right:0;width:230px;background:rgba(3,8,18,.97);border:1px solid rgba(99,102,241,.35);border-radius:10px;padding:12px;display:none;backdrop-filter:blur(12px);}
+      #mp-box.open{display:block;}
+      .mp-label{font-size:.62rem;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#94a3b8;margin-bottom:3px;}
+      .mp-input{width:100%;background:rgba(255,255,255,.07);border:1px solid rgba(99,102,241,.3);border-radius:6px;padding:5px 9px;color:#fff;font-size:.78rem;margin-bottom:7px;outline:none;}
+      .mp-btn{width:100%;padding:7px;border-radius:7px;border:none;font-size:.72rem;font-weight:700;cursor:pointer;margin-bottom:5px;letter-spacing:.06em;}
+      .mp-btn-host{background:linear-gradient(135deg,#6366f1,#8b5cf6);color:#fff;}
+      .mp-btn-join{background:rgba(99,102,241,.18);border:1px solid rgba(99,102,241,.35);color:#c7d2fe;}
+      .mp-status{font-size:.68rem;color:#94a3b8;text-align:center;margin-top:3px;}
+      .mp-code{font-size:1.05rem;font-weight:900;color:#06b6d4;text-align:center;letter-spacing:.2em;padding:5px;background:rgba(6,182,212,.1);border-radius:6px;margin:5px 0;}
+      .mp-player-row{display:flex;align-items:center;gap:6px;padding:3px 0;font-size:.7rem;color:#e2e8ff;}
+      .mp-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0;}
+    </style>
+    <button id="mp-toggle">⚡ MULTIPLAYER</button>
+    <div id="mp-box">
+      <div class="mp-label">Your Name</div>
+      <input class="mp-input" id="mp-name" placeholder="Sorcerer" maxlength="16" value="${window.NEXUS_PLAYER_NAME||'Sorcerer'}">
+      <button class="mp-btn mp-btn-host" id="mp-host-btn">⚔️ HOST MATCH</button>
+      <div class="mp-label">Join with code</div>
+      <input class="mp-input" id="mp-code-input" placeholder="ABC123" maxlength="6" style="text-transform:uppercase;letter-spacing:.15em;">
+      <button class="mp-btn mp-btn-join" id="mp-join-btn">→ JOIN MATCH</button>
+      <div class="mp-status" id="mp-status">Not connected</div>
+      <div id="mp-players" style="margin-top:6px;"></div>
+    </div>
+  `;
+  document.body.appendChild(panel);
+
+  document.getElementById('mp-toggle').onclick = () => document.getElementById('mp-box').classList.toggle('open');
+
+  function setStatus(msg, color) {
+    const el = document.getElementById('mp-status');
+    el.textContent = msg; el.style.color = color || '#94a3b8';
+  }
+
+  function updatePlayerList() {
+    const el = document.getElementById('mp-players');
+    let html = '';
+    NexusMP.players.forEach((p, id) => {
+      const isMe = id === NexusMP.myId;
+      const color = isMe ? '#10b981' : COLORS[colorIdx % COLORS.length];
+      html += `<div class="mp-player-row"><div class="mp-dot" style="background:${color}"></div>${p.name}${isMe?' (you)':''}</div>`;
+    });
+    el.innerHTML = html;
+  }
+
+  function onConnected() {
+    mpActive = true;
+    updatePlayerList();
+
+    // Listen for all player states
+    NexusMP.on('pstate', (data) => {
+      if (!data) return;
+      for (const [id, pData] of Object.entries(data)) {
+        if (id === NexusMP.myId) continue;
+        if (!remotePlayers.has(id)) {
+          remotePlayers.set(id, { color: COLORS[colorIdx++ % COLORS.length] });
+        }
+        Object.assign(remotePlayers.get(id), pData);
+      }
+    });
+
+    // Listen for kills
+    NexusMP.on('kills', (data) => {
+      if (!data) return;
+      for (const [id, killData] of Object.entries(data)) {
+        if (killData && killData.victim && killData.killer !== NexusMP.myId) {
+          // Mark remote player as dead
+          const rp = remotePlayers.get(killData.victim);
+          if (rp) rp.alive = false;
+          addKillFeed(`${killData.killerName} eliminated ${killData.victimName}`);
+        }
+      }
+    });
+
+    NexusMP.onPlayerJoin((id, p) => {
+      updatePlayerList();
+      setStatus(`${p.name} joined!`, '#10b981');
+      remotePlayers.set(id, { color: COLORS[colorIdx++ % COLORS.length], alive: true, name: p.name });
+    });
+    NexusMP.onPlayerLeave((id) => {
+      remotePlayers.delete(id);
+      updatePlayerList();
+    });
+  }
+
+  async function hostMatch() {
+    const name = document.getElementById('mp-name').value.trim() || 'Sorcerer';
+    localStorage.setItem('nexus_playername', name);
+    setStatus('Creating room…', '#06b6d4');
+    try {
+      const { roomCode } = await NexusMP.init(GAME_ID, name);
+      setStatus('Waiting for players…', '#10b981');
+      const codeEl = document.createElement('div');
+      codeEl.className = 'mp-code'; codeEl.textContent = roomCode;
+      document.getElementById('mp-players').before(codeEl);
+      onConnected();
+    } catch(e) { setStatus('Error: ' + e.message, '#ef4444'); }
+  }
+
+  async function joinMatch() {
+    const name = document.getElementById('mp-name').value.trim() || 'Sorcerer';
+    const code = document.getElementById('mp-code-input').value.trim().toUpperCase();
+    if (!code) { setStatus('Enter a room code', '#ef4444'); return; }
+    localStorage.setItem('nexus_playername', name);
+    setStatus('Joining…', '#06b6d4');
+    try {
+      await NexusMP.join(GAME_ID, code, name);
+      setStatus('Connected!', '#10b981');
+      onConnected();
+    } catch(e) { setStatus('Error: ' + e.message, '#ef4444'); }
+  }
+
+  document.getElementById('mp-host-btn').onclick = hostMatch;
+  document.getElementById('mp-join-btn').onclick = joinMatch;
+
+  // ── Broadcast own state every 50ms ────────────────────────────────────────
+  let _lastBroadcast = 0;
+  const _origGameLoop = window.gameLoop;
+  window.gameLoop = function(now) {
+    _origGameLoop(now);
+    if (!mpActive || !G || !G.player) return;
+
+    // Broadcast position
+    if (now - _lastBroadcast > 50) {
+      _lastBroadcast = now;
+      const p = G.player;
+      NexusMP.send('pstate/' + NexusMP.myId, {
+        x: Math.round(p.x), y: Math.round(p.y),
+        hp: Math.round(p.hp), alive: p.alive,
+        kills: p.kills || 0,
+        name: localStorage.getItem('nexus_playername') || 'Sorcerer',
+        techIdx: selectedTechIdx,
+        ts: now,
+      });
+    }
+
+    // Draw remote players
+    if (!window.canvas) return;
+    const ctx = canvas.getContext('2d');
+    const camX = (G.player.alive ? G.player.x : MAP_SIZE/2) - canvas.width/2;
+    const camY = (G.player.alive ? G.player.y : MAP_SIZE/2) - canvas.height/2;
+
+    remotePlayers.forEach((rp) => {
+      if (!rp.alive || !rp.x) return;
+      const sx = rp.x - camX, sy = rp.y - camY;
+      ctx.save();
+      // Body
+      ctx.beginPath();
+      ctx.arc(sx, sy, 12, 0, Math.PI * 2);
+      ctx.fillStyle = rp.color || '#06b6d4';
+      ctx.globalAlpha = 0.85;
+      ctx.fill();
+      ctx.globalAlpha = 1;
+      // HP bar
+      const hpPct = Math.max(0, (rp.hp || 0) / 100);
+      ctx.fillStyle = 'rgba(0,0,0,.5)';
+      ctx.fillRect(sx - 16, sy - 20, 32, 4);
+      ctx.fillStyle = hpPct > 0.5 ? '#10b981' : hpPct > 0.25 ? '#f59e0b' : '#ef4444';
+      ctx.fillRect(sx - 16, sy - 20, 32 * hpPct, 4);
+      // Name
+      ctx.fillStyle = '#fff';
+      ctx.font = 'bold 9px Inter';
+      ctx.textAlign = 'center';
+      ctx.fillText(rp.name || '?', sx, sy - 24);
+      ctx.restore();
+    });
+  };
+
+  // ── Report kills ──────────────────────────────────────────────────────────
+  const _origEliminatePlayer = window.eliminatePlayer;
+  window.eliminatePlayer = function(entity, killer) {
+    _origEliminatePlayer(entity, killer);
+    if (mpActive && killer && killer.isPlayer) {
+      NexusMP.send('kills/' + Date.now(), {
+        killer: NexusMP.myId,
+        killerName: localStorage.getItem('nexus_playername') || 'Sorcerer',
+        victim: entity.mpId || entity.name,
+        victimName: entity.name,
+        ts: Date.now(),
+      });
+    }
+  };
+
+  // Tag player with mpId for kill tracking
+  const _origStartGame = window.startGame;
+  window.startGame = function() {
+    _origStartGame();
+    if (G && G.player) G.player.mpId = NexusMP.myId;
+  };
+})();
+</script>
 <script>(function(){
   var id='culling-colony';
   var p=parseInt(localStorage.getItem('nexus_plays_'+id)||'0')+1;

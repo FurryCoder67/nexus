@@ -771,6 +771,197 @@ function idleDraw() {
 }
 idleDraw();
 </script>
+<script src="../nexus-config.js"></script>
+<script src="../nexus-mp.js"></script>
+<script>
+// ── DOMAIN DEFENDER MULTIPLAYER — Shared Tower Grid ───────────────────────────
+// Both players place towers on the same board. CE is pooled.
+// Either player can start waves. Lives are shared.
+(function(){
+  const GAME_ID = 'domain-defender';
+  let mpActive = false;
+
+  // ── Sync tower placements ─────────────────────────────────────────────────
+  const _origPlaceTower = window.placeTower;
+  window.placeTower = function(def, row, col) {
+    _origPlaceTower(def, row, col);
+    if (mpActive) {
+      NexusMP.send('towers/' + row + '_' + col, {
+        defId: def.id,
+        row, col,
+        placedBy: NexusMP.myId,
+        ts: Date.now(),
+      });
+    }
+  };
+
+  // Apply opponent tower placements
+  function applyRemoteTower(data) {
+    if (!data || !data.defId) return;
+    const def = TOWER_DEFS.find(d => d.id === data.defId);
+    if (!def) return;
+    const r = data.row, c = data.col;
+    if (!grid[r] || !grid[r][c]) return;
+    if (grid[r][c].hasTower || grid[r][c].hasPath) return;
+    _origPlaceTower(def, r, c);
+    updateHUD();
+  }
+
+  // ── Sync wave start ───────────────────────────────────────────────────────
+  const _origStartWave = window.startWave;
+  window.startWave = function() {
+    _origStartWave();
+    if (mpActive) {
+      NexusMP.send('wave', { wave, startedBy: NexusMP.myId, ts: Date.now() });
+    }
+  };
+
+  // ── Sync lives & CE ───────────────────────────────────────────────────────
+  setInterval(() => {
+    if (!mpActive || gamePhase !== 'playing') return;
+    NexusMP.send('gamestate', { lives, ce, wave, score, kills, ts: Date.now(), by: NexusMP.myId });
+  }, 1000);
+
+  // ── Multiplayer UI ────────────────────────────────────────────────────────
+  const panel = document.createElement('div');
+  panel.id = 'mp-panel';
+  panel.innerHTML = `
+    <style>
+      #mp-panel{position:fixed;top:52px;right:12px;z-index:4000;width:220px;font-family:'Courier New',monospace;}
+      #mp-toggle{background:rgba(96,165,250,.85);border:none;border-radius:4px;padding:6px 14px;color:#fff;font-size:.7rem;font-weight:700;letter-spacing:.1em;cursor:pointer;width:100%;margin-bottom:5px;}
+      #mp-box{background:rgba(5,5,26,.97);border:1px solid #1a2a5a;border-radius:6px;padding:12px;display:none;}
+      #mp-box.open{display:block;}
+      .mp-label{font-size:.6rem;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#555;margin-bottom:3px;}
+      .mp-input{width:100%;background:rgba(255,255,255,.05);border:1px solid #1a2a5a;border-radius:3px;padding:5px 8px;color:#fff;font-size:.72rem;margin-bottom:7px;outline:none;font-family:inherit;}
+      .mp-btn{width:100%;padding:7px;border-radius:4px;border:none;font-size:.68rem;font-weight:700;cursor:pointer;margin-bottom:5px;letter-spacing:.08em;font-family:inherit;}
+      .mp-btn-host{background:linear-gradient(135deg,#60a5fa,#3b82f6);color:#fff;}
+      .mp-btn-join{background:rgba(96,165,250,.12);border:1px solid #1a2a5a;color:#93c5fd;}
+      .mp-status{font-size:.65rem;color:#555;text-align:center;margin-top:3px;}
+      .mp-code{font-size:1rem;font-weight:900;color:#60a5fa;text-align:center;letter-spacing:.2em;padding:5px;background:rgba(96,165,250,.08);border-radius:3px;margin:5px 0;}
+      .mp-player-row{display:flex;align-items:center;gap:5px;padding:3px 0;font-size:.68rem;color:#e2e8ff;}
+      .mp-dot{width:6px;height:6px;border-radius:50%;background:#22c55e;flex-shrink:0;}
+      .mp-dot.opp{background:#60a5fa;}
+      #mp-ally-hud{position:fixed;bottom:120px;right:12px;z-index:3000;background:rgba(5,5,26,.9);border:1px solid #1a2a5a;border-radius:5px;padding:8px 12px;font-family:'Courier New',monospace;font-size:.68rem;color:#a0aec0;display:none;}
+      #mp-ally-hud.visible{display:block;}
+    </style>
+    <button id="mp-toggle">⚡ CO-OP</button>
+    <div id="mp-box">
+      <div class="mp-label">Your Name</div>
+      <input class="mp-input" id="mp-name" placeholder="Sorcerer" maxlength="16" value="${window.NEXUS_PLAYER_NAME||'Sorcerer'}">
+      <button class="mp-btn mp-btn-host" id="mp-host-btn">🏰 HOST DEFENSE</button>
+      <div class="mp-label">Join with code</div>
+      <input class="mp-input" id="mp-code-input" placeholder="ABC123" maxlength="6" style="text-transform:uppercase;letter-spacing:.12em;">
+      <button class="mp-btn mp-btn-join" id="mp-join-btn">→ JOIN</button>
+      <div class="mp-status" id="mp-status">Not connected</div>
+      <div id="mp-players"></div>
+    </div>
+    <div id="mp-ally-hud">
+      <div style="color:#60a5fa;font-weight:700;margin-bottom:4px;">ALLY STATUS</div>
+      <div>SCORE: <span id="ally-score" style="color:#ffcc00">—</span></div>
+      <div>KILLS: <span id="ally-kills" style="color:#60a5fa">—</span></div>
+    </div>
+  `;
+  document.body.appendChild(panel);
+
+  document.getElementById('mp-toggle').onclick = () => document.getElementById('mp-box').classList.toggle('open');
+
+  function setStatus(msg, color) {
+    const el = document.getElementById('mp-status');
+    el.textContent = msg; el.style.color = color || '#555';
+  }
+
+  function updatePlayerList() {
+    const el = document.getElementById('mp-players');
+    let html = '';
+    NexusMP.players.forEach((p, id) => {
+      const isMe = id === NexusMP.myId;
+      html += `<div class="mp-player-row"><div class="mp-dot${isMe?'':' opp'}"></div>${p.name}${isMe?' (you)':''}</div>`;
+    });
+    el.innerHTML = html;
+  }
+
+  function onConnected() {
+    mpActive = true;
+    document.getElementById('mp-ally-hud').classList.add('visible');
+    updatePlayerList();
+
+    // Listen for opponent tower placements
+    NexusMP.on('towers', (data) => {
+      if (!data) return;
+      for (const [key, tData] of Object.entries(data)) {
+        if (tData && tData.placedBy !== NexusMP.myId) {
+          applyRemoteTower(tData);
+        }
+      }
+    });
+
+    // Listen for opponent game state
+    NexusMP.on('gamestate', (data) => {
+      if (!data || data.by === NexusMP.myId) return;
+      document.getElementById('ally-score').textContent = data.score || 0;
+      document.getElementById('ally-kills').textContent = data.kills || 0;
+    });
+
+    // Listen for wave start from opponent
+    NexusMP.on('wave', (data) => {
+      if (!data || data.startedBy === NexusMP.myId) return;
+      if (!waveActive && gamePhase === 'playing') _origStartWave();
+    });
+
+    NexusMP.onPlayerJoin((id, p) => {
+      updatePlayerList();
+      setStatus(`${p.name} joined! Co-op active!`, '#22c55e');
+      // Sync current tower state to new player
+      if (NexusMP.isHost) {
+        towers.forEach(t => {
+          NexusMP.send('towers/' + t.row + '_' + t.col, {
+            defId: t.defId || t.id,
+            row: t.row, col: t.col,
+            placedBy: NexusMP.myId,
+            ts: Date.now(),
+          });
+        });
+      }
+    });
+    NexusMP.onPlayerLeave((id) => {
+      updatePlayerList();
+      setStatus('Ally disconnected', '#ef4444');
+    });
+  }
+
+  async function hostDefense() {
+    const name = document.getElementById('mp-name').value.trim() || 'Sorcerer';
+    localStorage.setItem('nexus_playername', name);
+    setStatus('Creating room…', '#60a5fa');
+    try {
+      const { roomCode } = await NexusMP.init(GAME_ID, name);
+      setStatus('Waiting for ally…', '#22c55e');
+      const codeEl = document.createElement('div');
+      codeEl.className = 'mp-code'; codeEl.textContent = roomCode;
+      document.getElementById('mp-players').before(codeEl);
+      onConnected();
+    } catch(e) { setStatus('Error: ' + e.message, '#ef4444'); }
+  }
+
+  async function joinDefense() {
+    const name = document.getElementById('mp-name').value.trim() || 'Sorcerer';
+    const code = document.getElementById('mp-code-input').value.trim().toUpperCase();
+    if (!code) { setStatus('Enter a room code', '#ef4444'); return; }
+    localStorage.setItem('nexus_playername', name);
+    setStatus('Joining…', '#60a5fa');
+    try {
+      await NexusMP.join(GAME_ID, code, name);
+      setStatus('Connected! Co-op active!', '#22c55e');
+      onConnected();
+      // Start game if not already started
+      if (gamePhase === 'idle') initGame();
+    } catch(e) { setStatus('Error: ' + e.message, '#ef4444'); }
+  }
+
+  document.getElementById('mp-host-btn').onclick = hostDefense;
+  document.getElementById('mp-join-btn').onclick = joinDefense;
+})();
+</script>
 <script>(function(){
   var id='domain-defender';
   var p=parseInt(localStorage.getItem('nexus_plays_'+id)||'0')+1;
