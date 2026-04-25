@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Reverse Cursed — NEXUS</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&family=Orbitron:wght@700;900&display=swap" rel="stylesheet" />
+  <style>
+    *,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+    :root{--bg:#050510;--text:#fff;--muted:#94a3b8;}
+    html,body{width:100%;height:100%;overflow:hidden;background:var(--bg);color:var(--text);font-family:'Inter',system-ui,sans-serif;}
+    body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellipse at 50% 40%,rgba(16,185,129,.12) 0%,transparent 70%);pointer-events:none;}
+    .back{position:fixed;top:14px;left:16px;z-index:100;display:flex;align-items:center;gap:6px;background:rgba(99,102,241,.15);border:1px solid rgba(99,102,241,.3);color:#c7d2fe;padding:6px 14px;border-radius:8px;text-decoration:none;font-size:.78rem;font-weight:700;letter-spacing:.06em;transition:all .15s;}
+    .back:hover{background:rgba(99,102,241,.3);color:#fff;}
+    .center{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:20px;text-align:center;padding:24px;}
+    .icon{font-size:5rem;margin-bottom:8px;filter:drop-shadow(0 0 32px rgba(16,185,129,.7));}
+    h1{font-family:'Orbitron';font-size:clamp(2rem,6vw,3.5rem);font-weight:900;letter-spacing:.06em;background:linear-gradient(135deg,#6ee7b7 0%,#10b981 50%,#06b6d4 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;}
+    .genre{font-size:.8rem;font-weight:700;letter-spacing:.15em;text-transform:uppercase;color:var(--muted);margin-top:-8px;}
+    .desc{max-width:480px;color:var(--muted);line-height:1.7;font-size:.95rem;}
+    .badge{display:inline-flex;align-items:center;gap:8px;background:rgba(245,158,11,.12);border:1px solid rgba(245,158,11,.3);color:#fbbf24;padding:8px 20px;border-radius:8px;font-size:.85rem;font-weight:700;letter-spacing:.08em;}
+    .rings{position:fixed;inset:0;pointer-events:none;display:flex;align-items:center;justify-content:center;}
+    .ring{position:absolute;border-radius:50%;border:1px solid rgba(16,185,129,.1);animation:spin linear infinite;}
+    .ring:nth-child(1){width:400px;height:400px;animation-duration:22s;}
+    .ring:nth-child(2){width:600px;height:600px;animation-duration:38s;animation-direction:reverse;}
+    .ring:nth-child(3){width:800px;height:800px;animation-duration:55s;}
+    @keyframes spin{to{transform:rotate(360deg);}}
+  </style>
+</head>
+<body>
+  <div class="rings"><div class="ring"></div><div class="ring"></div><div class="ring"></div></div>
+  <a class="back" href="../../index.html">← NEXUS</a>
+  <div class="center">
+    <div class="icon">💚</div>
+    <h1>REVERSE CURSED</h1>
+    <div class="genre">Healing · Tactical</div>
+    <p class="desc">Master the Reverse Cursed Technique. Heal allies, reconstruct the battlefield, and turn cursed energy against itself. A tactical support game where healing is your weapon.</p>
+    <div class="badge">⚡ Coming Soon</div>
+  </div>
+</body>
+</html>

@@ -1,0 +1,2259 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>NEXUS — Cursed Gaming Platform</title>
+  <style>
+    /* ── RESET & CUSTOM PROPERTIES ── */
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+    :root {
+      --bg: #06040f;
+      --card: #0f0b1a;
+      --card-hover: #161224;
+      --accent: #7c3aed;
+      --accent2: #06b6d4;
+      --text: #f1f5f9;
+      --muted: #64748b;
+      --border: rgba(124, 58, 237, 0.2);
+      --success: #22c55e;
+      --gold: #f59e0b;
+      --red: #ef4444;
+      --nav-h: 56px;
+      --sidebar-w: 220px;
+      --rsidebar-w: 280px;
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      overflow-x: hidden;
+      min-height: 100vh;
+    }
+
+    /* ── SCROLLBAR ── */
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: var(--bg); }
+    ::-webkit-scrollbar-thumb { background: var(--accent); border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: #9d5cf6; }
+
+    /* ── PARTICLE CANVAS ── */
+    #particle-canvas {
+      position: fixed;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      pointer-events: none;
+      z-index: 0;
+      opacity: 0.35;
+    }
+
+    /* ── TOP NAV ── */
+    .nav {
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      height: var(--nav-h);
+      background: rgba(6, 4, 15, 0.92);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      padding: 0 18px;
+      gap: 14px;
+      z-index: 1000;
+    }
+
+    .nav-logo {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      flex-shrink: 0;
+      text-decoration: none;
+    }
+
+    .nav-logo-icon {
+      width: 34px; height: 34px;
+      background: linear-gradient(135deg, var(--accent), #9d5cf6);
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 900;
+      font-size: 18px;
+      color: #fff;
+      box-shadow: 0 0 18px rgba(124, 58, 237, 0.6);
+      letter-spacing: -1px;
+    }
+
+    .nav-logo-text {
+      font-size: 17px;
+      font-weight: 800;
+      color: var(--text);
+      letter-spacing: 2px;
+      text-transform: uppercase;
+    }
+
+    .nav-search {
+      flex: 1;
+      max-width: 420px;
+      margin: 0 auto;
+      position: relative;
+    }
+
+    .nav-search input {
+      width: 100%;
+      height: 34px;
+      background: rgba(124, 58, 237, 0.08);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 0 14px 0 36px;
+      color: var(--text);
+      font-size: 13px;
+      outline: none;
+      transition: border-color 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .nav-search input::placeholder { color: var(--muted); }
+
+    .nav-search input:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.18);
+    }
+
+    .nav-search-icon {
+      position: absolute;
+      left: 11px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: var(--muted);
+      font-size: 14px;
+      pointer-events: none;
+    }
+
+    .nav-right {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-shrink: 0;
+      margin-left: auto;
+    }
+
+    .nav-coins {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      background: rgba(245, 158, 11, 0.1);
+      border: 1px solid rgba(245, 158, 11, 0.25);
+      border-radius: 6px;
+      padding: 5px 10px;
+      cursor: pointer;
+      transition: background 0.2s ease;
+    }
+
+    .nav-coins:hover { background: rgba(245, 158, 11, 0.18); }
+
+    .coin-icon {
+      width: 16px; height: 16px;
+      background: var(--gold);
+      clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
+      flex-shrink: 0;
+    }
+
+    .nav-coins span {
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--gold);
+    }
+
+    .nav-bell {
+      position: relative;
+      width: 34px; height: 34px;
+      background: rgba(255,255,255,0.05);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      font-size: 16px;
+      transition: background 0.2s ease;
+    }
+
+    .nav-bell:hover { background: rgba(124, 58, 237, 0.15); }
+
+    .bell-dot {
+      position: absolute;
+      top: 6px; right: 6px;
+      width: 7px; height: 7px;
+      background: var(--red);
+      border-radius: 50%;
+      border: 1px solid var(--bg);
+    }
+
+    .notif-dropdown {
+      position: absolute;
+      top: calc(100% + 10px);
+      right: 0;
+      width: 280px;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 6px;
+      display: none;
+      z-index: 2000;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+    }
+
+    .notif-dropdown.open { display: block; }
+
+    .notif-item {
+      padding: 10px 12px;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: background 0.15s ease;
+      display: flex;
+      gap: 10px;
+      align-items: flex-start;
+    }
+
+    .notif-item:hover { background: var(--card-hover); }
+
+    .notif-dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: var(--accent);
+      margin-top: 4px;
+      flex-shrink: 0;
+    }
+
+    .notif-text { font-size: 12px; color: var(--text); line-height: 1.5; }
+    .notif-time { font-size: 11px; color: var(--muted); margin-top: 2px; }
+
+    .nav-avatar {
+      position: relative;
+      width: 34px; height: 34px;
+      background: linear-gradient(135deg, var(--accent), #06b6d4);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 14px;
+      cursor: pointer;
+      border: 2px solid var(--border);
+      transition: border-color 0.2s ease;
+      flex-shrink: 0;
+    }
+
+    .nav-avatar:hover { border-color: var(--accent); }
+
+    .avatar-dropdown {
+      position: absolute;
+      top: calc(100% + 10px);
+      right: 0;
+      width: 160px;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 6px;
+      display: none;
+      z-index: 2000;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+    }
+
+    .avatar-dropdown.open { display: block; }
+
+    .avatar-dd-item {
+      padding: 9px 12px;
+      border-radius: 5px;
+      cursor: pointer;
+      font-size: 13px;
+      color: var(--text);
+      transition: background 0.15s ease;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .avatar-dd-item:hover { background: var(--card-hover); }
+    .avatar-dd-item.danger { color: #ef4444; }
+
+    .nav-play-btn {
+      background: linear-gradient(135deg, var(--accent), #9d5cf6);
+      border: none;
+      border-radius: 6px;
+      padding: 8px 16px;
+      color: #fff;
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      cursor: pointer;
+      transition: opacity 0.2s ease, box-shadow 0.2s ease;
+      white-space: nowrap;
+    }
+
+    .nav-play-btn:hover {
+      opacity: 0.9;
+      box-shadow: 0 0 16px rgba(124, 58, 237, 0.5);
+    }
+
+    /* ── PAGE LAYOUT ── */
+    .page {
+      display: flex;
+      padding-top: var(--nav-h);
+      min-height: 100vh;
+      position: relative;
+      z-index: 1;
+    }
+
+    /* ── LEFT SIDEBAR ── */
+    .sidebar-left {
+      width: var(--sidebar-w);
+      position: fixed;
+      top: var(--nav-h);
+      left: 0;
+      bottom: 0;
+      background: rgba(15, 11, 26, 0.85);
+      backdrop-filter: blur(12px);
+      border-right: 1px solid var(--border);
+      overflow-y: auto;
+      overflow-x: hidden;
+      z-index: 100;
+      padding: 14px 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .sidebar-section-label {
+      font-size: 10px;
+      font-weight: 700;
+      color: var(--muted);
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      padding: 10px 10px 6px;
+      margin-top: 6px;
+    }
+
+    .sidebar-nav-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 9px 12px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 14px;
+      color: var(--muted);
+      transition: background 0.15s ease, color 0.15s ease;
+      position: relative;
+      text-decoration: none;
+    }
+
+    .sidebar-nav-item:hover {
+      background: rgba(124, 58, 237, 0.1);
+      color: var(--text);
+    }
+
+    .sidebar-nav-item.active {
+      background: rgba(124, 58, 237, 0.2);
+      color: var(--text);
+    }
+
+    .sidebar-nav-item.active::before {
+      content: '';
+      position: absolute;
+      left: 0; top: 6px; bottom: 6px;
+      width: 3px;
+      background: var(--accent);
+      border-radius: 0 2px 2px 0;
+    }
+
+    .sidebar-nav-icon { font-size: 16px; width: 20px; text-align: center; }
+
+    .sidebar-badge {
+      margin-left: auto;
+      background: var(--success);
+      color: #fff;
+      font-size: 10px;
+      font-weight: 700;
+      padding: 2px 7px;
+      border-radius: 10px;
+      white-space: nowrap;
+    }
+
+    .sidebar-divider {
+      height: 1px;
+      background: var(--border);
+      margin: 8px 0;
+    }
+
+    .online-friends { margin-top: 4px; }
+
+    .friend-item {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      padding: 7px 10px;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: background 0.15s ease;
+    }
+
+    .friend-item:hover { background: rgba(255,255,255,0.04); }
+
+    .friend-avatar {
+      width: 30px; height: 30px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+      font-weight: 700;
+      flex-shrink: 0;
+      position: relative;
+    }
+
+    .friend-avatar::after {
+      content: '';
+      position: absolute;
+      bottom: 0; right: 0;
+      width: 9px; height: 9px;
+      border-radius: 50%;
+      background: var(--success);
+      border: 1.5px solid var(--bg);
+    }
+
+    .friend-info { flex: 1; min-width: 0; }
+    .friend-name { font-size: 12px; font-weight: 600; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .friend-status { font-size: 11px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+    /* ── MAIN CONTENT ── */
+    .main {
+      margin-left: var(--sidebar-w);
+      margin-right: var(--rsidebar-w);
+      flex: 1;
+      padding: 24px 24px 40px;
+      min-width: 0;
+    }
+
+    /* ── FEATURED BANNER ── */
+    .featured-banner {
+      border-radius: 8px;
+      padding: 36px 40px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: relative;
+      overflow: hidden;
+      background: linear-gradient(135deg, #0d0820 0%, #1a0a35 40%, #06142a 100%);
+      border: 1px solid rgba(124, 58, 237, 0.3);
+      margin-bottom: 32px;
+    }
+
+    .featured-banner::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background:
+        radial-gradient(ellipse at 20% 50%, rgba(124, 58, 237, 0.18) 0%, transparent 60%),
+        radial-gradient(ellipse at 80% 30%, rgba(6, 182, 212, 0.12) 0%, transparent 50%);
+      pointer-events: none;
+    }
+
+    /* animated energy wisps */
+    .banner-wisps {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      overflow: hidden;
+    }
+
+    .wisp {
+      position: absolute;
+      border-radius: 50%;
+      filter: blur(40px);
+      animation: wispFloat 6s ease-in-out infinite;
+      opacity: 0.25;
+    }
+
+    .wisp-1 {
+      width: 200px; height: 80px;
+      background: var(--accent);
+      top: 10%; left: 5%;
+      animation-delay: 0s;
+    }
+
+    .wisp-2 {
+      width: 150px; height: 60px;
+      background: var(--accent2);
+      top: 60%; right: 15%;
+      animation-delay: -2s;
+    }
+
+    .wisp-3 {
+      width: 100px; height: 100px;
+      background: #9d5cf6;
+      bottom: 10%; left: 40%;
+      animation-delay: -4s;
+    }
+
+    @keyframes wispFloat {
+      0%, 100% { transform: translateY(0) scale(1); opacity: 0.2; }
+      50% { transform: translateY(-14px) scale(1.1); opacity: 0.35; }
+    }
+
+    .featured-content { position: relative; z-index: 1; }
+
+    .featured-label {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: rgba(124, 58, 237, 0.2);
+      border: 1px solid rgba(124, 58, 237, 0.4);
+      border-radius: 4px;
+      padding: 4px 10px;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      color: #a78bfa;
+      margin-bottom: 14px;
+    }
+
+    .featured-title {
+      font-size: 48px;
+      font-weight: 900;
+      letter-spacing: -1px;
+      line-height: 1;
+      color: var(--text);
+      text-shadow: 0 0 40px rgba(124, 58, 237, 0.4);
+      margin-bottom: 12px;
+    }
+
+    .featured-desc {
+      font-size: 14px;
+      color: var(--muted);
+      max-width: 380px;
+      line-height: 1.6;
+      margin-bottom: 20px;
+    }
+
+    .featured-players {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--success);
+      margin-bottom: 22px;
+    }
+
+    .online-dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: var(--success);
+      box-shadow: 0 0 6px var(--success);
+      animation: pulse 2s ease-in-out infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+
+    .featured-actions { display: flex; gap: 10px; }
+
+    .btn-primary {
+      background: linear-gradient(135deg, var(--accent), #9d5cf6);
+      border: none;
+      border-radius: 6px;
+      padding: 10px 22px;
+      color: #fff;
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: opacity 0.2s ease, box-shadow 0.2s ease;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .btn-primary:hover {
+      opacity: 0.9;
+      box-shadow: 0 0 20px rgba(124, 58, 237, 0.5);
+    }
+
+    .btn-outline {
+      background: transparent;
+      border: 1px solid rgba(124, 58, 237, 0.4);
+      border-radius: 6px;
+      padding: 10px 18px;
+      color: var(--text);
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s ease, border-color 0.2s ease;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .btn-outline:hover {
+      background: rgba(124, 58, 237, 0.1);
+      border-color: var(--accent);
+    }
+
+    /* Featured game symbol — CSS drawn */
+    .featured-symbol {
+      position: relative;
+      z-index: 1;
+      width: 220px;
+      height: 220px;
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .symbol-ring {
+      position: absolute;
+      border-radius: 50%;
+      border: 1px solid rgba(124, 58, 237, 0.4);
+      animation: spinRing linear infinite;
+    }
+
+    .symbol-ring-1 {
+      width: 180px; height: 180px;
+      border-top-color: var(--accent);
+      animation-duration: 8s;
+    }
+
+    .symbol-ring-2 {
+      width: 130px; height: 130px;
+      border-right-color: var(--accent2);
+      animation-duration: 5s;
+      animation-direction: reverse;
+    }
+
+    .symbol-ring-3 {
+      width: 80px; height: 80px;
+      border-bottom-color: #a78bfa;
+      animation-duration: 3s;
+    }
+
+    @keyframes spinRing {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
+
+    .symbol-core {
+      width: 44px; height: 44px;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%);
+      animation: corePulse 2s ease-in-out infinite;
+      box-shadow: 0 0 24px rgba(124, 58, 237, 0.8);
+      z-index: 1;
+    }
+
+    @keyframes corePulse {
+      0%, 100% { transform: scale(1) rotate(0deg); }
+      50% { transform: scale(1.1) rotate(45deg); }
+    }
+
+    /* ── SECTION HEADER ── */
+    .section-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 14px;
+    }
+
+    .section-title {
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--text);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .section-see-all {
+      font-size: 12px;
+      color: var(--accent);
+      cursor: pointer;
+      text-decoration: none;
+      font-weight: 600;
+      transition: color 0.15s ease;
+    }
+
+    .section-see-all:hover { color: #a78bfa; }
+
+    /* ── HORIZONTAL SCROLL ROW ── */
+    .scroll-row {
+      display: flex;
+      gap: 14px;
+      overflow-x: auto;
+      padding-bottom: 8px;
+      margin-bottom: 32px;
+      scrollbar-width: thin;
+      scrollbar-color: var(--accent) transparent;
+    }
+
+    .scroll-row::-webkit-scrollbar { height: 4px; }
+    .scroll-row::-webkit-scrollbar-thumb { background: var(--accent); border-radius: 2px; }
+
+    /* ── GAME CARDS ── */
+    .game-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      overflow: hidden;
+      cursor: pointer;
+      transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease, background 0.2s ease;
+      position: relative;
+      flex-shrink: 0;
+    }
+
+    .game-card:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 8px 32px rgba(124, 58, 237, 0.25);
+      border-color: rgba(124, 58, 237, 0.5);
+      background: var(--card-hover);
+    }
+
+    /* Continue playing cards */
+    .continue-card {
+      width: 200px;
+    }
+
+    .continue-thumb {
+      height: 110px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .games-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 14px;
+      margin-bottom: 32px;
+    }
+
+    .grid-card .game-thumb {
+      height: 140px;
+    }
+
+    /* Thumbnail gradients per game (no images needed) */
+    .thumb-hunters {
+      background: linear-gradient(135deg, #1a0535 0%, #2d0a5e 40%, #0a1a3a 100%);
+    }
+    .thumb-arena {
+      background: linear-gradient(135deg, #0a1a10 0%, #1a3a1a 40%, #0d2030 100%);
+    }
+    .thumb-defender {
+      background: linear-gradient(135deg, #1a1a05 0%, #3a2a00 40%, #1a0a00 100%);
+    }
+    .thumb-trials {
+      background: linear-gradient(135deg, #05101a 0%, #0a2035 40%, #1a0520 100%);
+    }
+    .thumb-spirit {
+      background: linear-gradient(135deg, #0a0505 0%, #200a0a 40%, #0a0a20 100%);
+    }
+    .thumb-culling {
+      background: linear-gradient(135deg, #050a1a 0%, #0a1535 40%, #150a30 100%);
+    }
+    .thumb-sorcerer {
+      background: linear-gradient(135deg, #0a0a05 0%, #251a05 40%, #0a0520 100%);
+    }
+    .thumb-vow {
+      background: linear-gradient(135deg, #050a10 0%, #0f1a25 40%, #200510 100%);
+    }
+    .thumb-void {
+      background: linear-gradient(135deg, #020208 0%, #0d0520 40%, #050215 100%);
+    }
+    .thumb-reverse {
+      background: linear-gradient(135deg, #021008 0%, #052015 40%, #021510 100%);
+    }
+    .thumb-quiz {
+      background: linear-gradient(135deg, #100a02 0%, #251a05 40%, #150a00 100%);
+    }
+
+    .game-thumb {
+      position: relative;
+      overflow: hidden;
+    }
+
+    /* Thumb decorative elements */
+    .game-thumb::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: inherit;
+    }
+
+    .thumb-glyph {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 38px;
+      opacity: 0.4;
+    }
+
+    .thumb-overlay {
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(to top, rgba(15, 11, 26, 0.6) 0%, transparent 60%);
+    }
+
+    /* Play button that slides up on hover */
+    .thumb-play-btn {
+      position: absolute;
+      bottom: -40px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: linear-gradient(135deg, var(--accent), #9d5cf6);
+      border: none;
+      border-radius: 5px;
+      padding: 7px 20px;
+      color: #fff;
+      font-size: 12px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: bottom 0.2s ease;
+      white-space: nowrap;
+      z-index: 2;
+    }
+
+    .game-card:hover .thumb-play-btn { bottom: 10px; }
+
+    .new-badge {
+      position: absolute;
+      top: 8px; left: 8px;
+      background: linear-gradient(135deg, var(--accent2), #0891b2);
+      border-radius: 4px;
+      padding: 3px 8px;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      color: #fff;
+      text-transform: uppercase;
+    }
+
+    .game-card-body {
+      padding: 10px 12px 12px;
+    }
+
+    .game-name {
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--text);
+      margin-bottom: 5px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .game-meta {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+
+    .game-genre {
+      background: rgba(124, 58, 237, 0.15);
+      border: 1px solid rgba(124, 58, 237, 0.25);
+      border-radius: 4px;
+      padding: 2px 7px;
+      font-size: 10px;
+      font-weight: 600;
+      color: #a78bfa;
+      white-space: nowrap;
+    }
+
+    .game-players {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 11px;
+      color: var(--success);
+      font-weight: 600;
+    }
+
+    .game-players .online-dot { width: 6px; height: 6px; }
+
+    .game-rating {
+      font-size: 11px;
+      color: var(--gold);
+      font-weight: 600;
+    }
+
+    /* ── LEADERBOARD ── */
+    .leaderboard-panel {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      overflow: hidden;
+      margin-bottom: 32px;
+    }
+
+    .leaderboard-header {
+      padding: 14px 18px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .leaderboard-title {
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--text);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .leaderboard-table { width: 100%; border-collapse: collapse; }
+
+    .leaderboard-table th {
+      font-size: 10px;
+      font-weight: 700;
+      color: var(--muted);
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      padding: 10px 18px;
+      text-align: left;
+      border-bottom: 1px solid var(--border);
+      background: rgba(0,0,0,0.2);
+    }
+
+    .leaderboard-table td {
+      padding: 10px 18px;
+      font-size: 13px;
+      color: var(--text);
+      border-bottom: 1px solid rgba(124, 58, 237, 0.06);
+    }
+
+    .leaderboard-table tr:last-child td { border-bottom: none; }
+
+    .leaderboard-table tr:hover td { background: rgba(124, 58, 237, 0.04); }
+
+    .rank-badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 22px; height: 22px;
+      border-radius: 4px;
+      font-size: 11px;
+      font-weight: 800;
+    }
+
+    .rank-1 { background: rgba(245, 158, 11, 0.2); color: var(--gold); }
+    .rank-2 { background: rgba(148, 163, 184, 0.15); color: #94a3b8; }
+    .rank-3 { background: rgba(180, 107, 50, 0.2); color: #b46b32; }
+    .rank-other { background: rgba(255,255,255,0.05); color: var(--muted); }
+
+    .player-cell {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+    }
+
+    .player-mini-avatar {
+      width: 26px; height: 26px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 11px;
+      font-weight: 700;
+      flex-shrink: 0;
+    }
+
+    .coin-earned {
+      color: var(--gold);
+      font-weight: 700;
+    }
+
+    /* ── RIGHT SIDEBAR ── */
+    .sidebar-right {
+      width: var(--rsidebar-w);
+      position: fixed;
+      top: var(--nav-h);
+      right: 0;
+      bottom: 0;
+      background: rgba(15, 11, 26, 0.85);
+      backdrop-filter: blur(12px);
+      border-left: 1px solid var(--border);
+      overflow-y: auto;
+      z-index: 100;
+      padding: 16px 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+    }
+
+    .right-panel {
+      background: rgba(0,0,0,0.25);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      overflow: hidden;
+    }
+
+    .right-panel-header {
+      padding: 12px 14px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .right-panel-title {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+
+    .right-panel-body { padding: 10px 14px; }
+
+    /* Activity feed */
+    .activity-item {
+      display: flex;
+      gap: 10px;
+      padding: 8px 0;
+      border-bottom: 1px solid rgba(255,255,255,0.04);
+    }
+
+    .activity-item:last-child { border-bottom: none; }
+
+    .activity-avatar {
+      width: 28px; height: 28px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 11px;
+      font-weight: 700;
+      flex-shrink: 0;
+    }
+
+    .activity-text {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .activity-msg { font-size: 12px; color: var(--text); line-height: 1.4; }
+    .activity-msg strong { color: var(--accent2); }
+    .activity-time { font-size: 11px; color: var(--muted); margin-top: 2px; }
+
+    /* Challenges */
+    .challenge-item { padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.04); }
+    .challenge-item:last-child { border-bottom: none; }
+
+    .challenge-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 6px;
+    }
+
+    .challenge-name { font-size: 12px; font-weight: 600; color: var(--text); }
+    .challenge-progress-text { font-size: 11px; color: var(--muted); }
+
+    .progress-bar {
+      height: 5px;
+      background: rgba(255,255,255,0.08);
+      border-radius: 3px;
+      overflow: hidden;
+    }
+
+    .progress-fill {
+      height: 100%;
+      border-radius: 3px;
+      background: linear-gradient(90deg, var(--accent), var(--accent2));
+      transition: width 0.3s ease;
+    }
+
+    .challenge-timer {
+      font-size: 11px;
+      color: var(--accent2);
+      font-weight: 700;
+      font-variant-numeric: tabular-nums;
+    }
+
+    /* Nexus Pass */
+    .nexus-pass {
+      background: linear-gradient(135deg, #1a0535 0%, #0a152a 100%);
+      border: 1px solid rgba(124, 58, 237, 0.35);
+      border-radius: 8px;
+      padding: 14px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .nexus-pass::before {
+      content: '';
+      position: absolute;
+      top: -20px; right: -20px;
+      width: 80px; height: 80px;
+      background: radial-gradient(circle, rgba(124, 58, 237, 0.3) 0%, transparent 70%);
+      border-radius: 50%;
+    }
+
+    .pass-label {
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: var(--accent);
+      margin-bottom: 4px;
+    }
+
+    .pass-season {
+      font-size: 14px;
+      font-weight: 800;
+      color: var(--text);
+      margin-bottom: 10px;
+    }
+
+    .pass-bar { margin-bottom: 6px; }
+    .pass-bar-bg {
+      height: 6px;
+      background: rgba(255,255,255,0.08);
+      border-radius: 3px;
+      overflow: hidden;
+    }
+
+    .pass-bar-fill {
+      height: 100%;
+      width: 62%;
+      background: linear-gradient(90deg, var(--accent), #9d5cf6);
+      border-radius: 3px;
+    }
+
+    .pass-meta {
+      display: flex;
+      justify-content: space-between;
+      font-size: 11px;
+    }
+
+    .pass-level { color: var(--text); font-weight: 600; }
+    .pass-xp { color: var(--muted); }
+
+    .pass-upgrade-btn {
+      display: block;
+      width: 100%;
+      margin-top: 10px;
+      background: linear-gradient(135deg, var(--accent), #9d5cf6);
+      border: none;
+      border-radius: 5px;
+      padding: 8px;
+      color: #fff;
+      font-size: 12px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: opacity 0.2s ease;
+    }
+
+    .pass-upgrade-btn:hover { opacity: 0.9; }
+
+    /* ── MODAL ── */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.75);
+      backdrop-filter: blur(6px);
+      z-index: 3000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.2s ease;
+    }
+
+    .modal-overlay.open {
+      opacity: 1;
+      pointer-events: all;
+    }
+
+    .modal {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      width: 420px;
+      max-width: 90vw;
+      overflow: hidden;
+      transform: scale(0.95) translateY(12px);
+      transition: transform 0.2s ease;
+    }
+
+    .modal-overlay.open .modal {
+      transform: scale(1) translateY(0);
+    }
+
+    .modal-header {
+      padding: 18px 20px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .modal-title { font-size: 16px; font-weight: 700; color: var(--text); }
+
+    .modal-close {
+      width: 28px; height: 28px;
+      background: rgba(255,255,255,0.06);
+      border: none;
+      border-radius: 5px;
+      color: var(--muted);
+      font-size: 16px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background 0.15s ease, color 0.15s ease;
+    }
+
+    .modal-close:hover { background: rgba(239, 68, 68, 0.15); color: #ef4444; }
+
+    .modal-body { padding: 24px 20px; }
+
+    .modal-game-banner {
+      height: 120px;
+      border-radius: 6px;
+      background: linear-gradient(135deg, #1a0535 0%, #2d0a5e 40%, #0a1a3a 100%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 18px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .modal-game-title {
+      font-size: 28px;
+      font-weight: 900;
+      color: var(--text);
+      letter-spacing: 2px;
+      text-shadow: 0 0 20px rgba(124, 58, 237, 0.6);
+      z-index: 1;
+    }
+
+    .modal-game-banner::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(ellipse at 30% 50%, rgba(124, 58, 237, 0.25) 0%, transparent 60%);
+    }
+
+    .connecting-status {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      background: rgba(34, 197, 94, 0.08);
+      border: 1px solid rgba(34, 197, 94, 0.2);
+      border-radius: 6px;
+      padding: 12px 14px;
+      margin-bottom: 16px;
+    }
+
+    .connecting-dot {
+      width: 10px; height: 10px;
+      border-radius: 50%;
+      background: var(--success);
+      animation: pulse 1s ease-in-out infinite;
+      flex-shrink: 0;
+    }
+
+    .connecting-text { font-size: 13px; color: var(--success); font-weight: 600; }
+
+    .modal-players-online {
+      font-size: 12px;
+      color: var(--muted);
+      margin-bottom: 18px;
+    }
+
+    .modal-footer {
+      display: flex;
+      gap: 10px;
+      justify-content: flex-end;
+    }
+
+    /* ── UTILITY ── */
+    .hidden { display: none !important; }
+
+    /* ── RESPONSIVE ── */
+    @media (max-width: 1200px) {
+      :root { --rsidebar-w: 0px; }
+      .sidebar-right { display: none; }
+    }
+
+    @media (max-width: 900px) {
+      :root { --sidebar-w: 0px; }
+      .sidebar-left { display: none; }
+      .main { margin-left: 0; margin-right: 0; padding: 16px; }
+      .games-grid { grid-template-columns: repeat(2, 1fr); }
+      .featured-symbol { display: none; }
+      .featured-title { font-size: 32px; }
+    }
+
+    @media (max-width: 600px) {
+      .games-grid { grid-template-columns: 1fr 1fr; }
+      .nav-search { display: none; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- Particle background -->
+<canvas id="particle-canvas"></canvas>
+
+<!-- ══════════════════════════════════════════
+     TOP NAVIGATION
+══════════════════════════════════════════ -->
+<nav class="nav">
+  <a class="nav-logo" href="#">
+    <div class="nav-logo-icon">N</div>
+    <span class="nav-logo-text">NEXUS</span>
+  </a>
+
+  <div class="nav-search">
+    <span class="nav-search-icon">⌕</span>
+    <input type="text" id="search-input" placeholder="Search games, players..." autocomplete="off" />
+  </div>
+
+  <div class="nav-right">
+    <div class="nav-coins" title="NexusCoin Balance">
+      <div class="coin-icon"></div>
+      <span>1,250</span>
+    </div>
+
+    <div class="nav-bell" id="bell-btn" title="Notifications">
+      🔔
+      <div class="bell-dot"></div>
+      <div class="notif-dropdown" id="notif-dropdown">
+        <div class="notif-item">
+          <div class="notif-dot"></div>
+          <div>
+            <div class="notif-text"><strong>Gojo_User</strong> challenged you to a domain battle</div>
+            <div class="notif-time">2 minutes ago</div>
+          </div>
+        </div>
+        <div class="notif-item">
+          <div class="notif-dot"></div>
+          <div>
+            <div class="notif-text">You ranked up to <strong>Grade 2 Sorcerer</strong>!</div>
+            <div class="notif-time">1 hour ago</div>
+          </div>
+        </div>
+        <div class="notif-item">
+          <div class="notif-dot" style="background:var(--gold)"></div>
+          <div>
+            <div class="notif-text">Daily reward available — claim your <strong>500 NexusCoin</strong></div>
+            <div class="notif-time">Today</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="nav-avatar" id="avatar-btn" title="Profile">
+      A
+      <div class="avatar-dropdown" id="avatar-dropdown">
+        <div class="avatar-dd-item">👤 Profile</div>
+        <div class="avatar-dd-item">⚙️ Settings</div>
+        <div class="avatar-dd-item">🏆 My Achievements</div>
+        <div class="avatar-dd-item danger">🚪 Sign Out</div>
+      </div>
+    </div>
+
+    <button class="nav-play-btn" id="nav-play-btn">▶ PLAY NOW</button>
+  </div>
+</nav>
+
+<!-- ══════════════════════════════════════════
+     PAGE LAYOUT
+══════════════════════════════════════════ -->
+<div class="page">
+
+  <!-- ── LEFT SIDEBAR ── -->
+  <aside class="sidebar-left">
+    <div class="sidebar-nav-item active" data-nav="home">
+      <span class="sidebar-nav-icon">🏠</span>
+      Home
+    </div>
+    <div class="sidebar-nav-item" data-nav="games">
+      <span class="sidebar-nav-icon">🎮</span>
+      Games
+    </div>
+    <div class="sidebar-nav-item" data-nav="friends">
+      <span class="sidebar-nav-icon">👥</span>
+      Friends
+      <span class="sidebar-badge">3 online</span>
+    </div>
+    <div class="sidebar-nav-item" data-nav="leaderboard">
+      <span class="sidebar-nav-icon">🏆</span>
+      Leaderboard
+    </div>
+    <div class="sidebar-nav-item" data-nav="store">
+      <span class="sidebar-nav-icon">🛒</span>
+      Store
+    </div>
+    <div class="sidebar-nav-item" data-nav="techniques">
+      <span class="sidebar-nav-icon">⚡</span>
+      Techniques
+    </div>
+    <div class="sidebar-nav-item" data-nav="settings">
+      <span class="sidebar-nav-icon">⚙️</span>
+      Settings
+    </div>
+
+    <div class="sidebar-divider"></div>
+    <div class="sidebar-section-label">Online Friends</div>
+
+    <div class="online-friends">
+      <div class="friend-item">
+        <div class="friend-avatar" style="background:linear-gradient(135deg,#7c3aed,#06b6d4)">G</div>
+        <div class="friend-info">
+          <div class="friend-name">Gojo_User</div>
+          <div class="friend-status">Playing HUNTERS</div>
+        </div>
+      </div>
+      <div class="friend-item">
+        <div class="friend-avatar" style="background:linear-gradient(135deg,#dc2626,#7c3aed)">S</div>
+        <div class="friend-info">
+          <div class="friend-name">SukunaFan</div>
+          <div class="friend-status">Playing Cursed Arena</div>
+        </div>
+      </div>
+      <div class="friend-item">
+        <div class="friend-avatar" style="background:linear-gradient(135deg,#059669,#06b6d4)">M</div>
+        <div class="friend-info">
+          <div class="friend-name">MegumiFan</div>
+          <div class="friend-status">In lobby</div>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ── MAIN CONTENT ── -->
+  <main class="main">
+
+    <!-- Featured Banner -->
+    <div class="featured-banner">
+      <div class="banner-wisps">
+        <div class="wisp wisp-1"></div>
+        <div class="wisp wisp-2"></div>
+        <div class="wisp wisp-3"></div>
+      </div>
+      <div class="featured-content">
+        <div class="featured-label">⚡ Featured Game</div>
+        <div class="featured-title">HUNTERS</div>
+        <div class="featured-desc">JJK-themed FPS — battle cursed spirits with powerful techniques, domain expansion and cursed energy combat.</div>
+        <div class="featured-players">
+          <div class="online-dot"></div>
+          1,247 playing now
+        </div>
+        <div class="featured-actions">
+          <button class="btn-primary" onclick="navigateToGame('games/jujutsuhunters/hunters.html')">▶ PLAY NOW</button>
+          <button class="btn-outline">ℹ GAME INFO</button>
+        </div>
+      </div>
+      <div class="featured-symbol">
+        <div class="symbol-ring symbol-ring-1"></div>
+        <div class="symbol-ring symbol-ring-2"></div>
+        <div class="symbol-ring symbol-ring-3"></div>
+        <div class="symbol-core"></div>
+      </div>
+    </div>
+
+    <!-- Continue Playing -->
+    <div class="section-header">
+      <div class="section-title">▶ Continue Playing</div>
+      <a class="section-see-all" href="#">See all</a>
+    </div>
+    <div class="scroll-row" id="continue-row">
+      <div class="game-card continue-card" data-game="hunters" onclick="navigateToGame('games/jujutsuhunters/hunters.html')">
+        <div class="continue-thumb thumb-hunters game-thumb">
+          <div class="thumb-glyph">⚔️</div>
+          <div class="thumb-overlay"></div>
+          <button class="thumb-play-btn">▶ PLAY</button>
+        </div>
+        <div class="game-card-body">
+          <div class="game-name">HUNTERS</div>
+          <div class="game-meta">
+            <span class="game-genre">FPS Combat</span>
+            <span class="game-rating">⭐ 4.9</span>
+          </div>
+        </div>
+      </div>
+      <div class="game-card continue-card" data-game="cursed-arena" onclick="navigateToGame('games/cursed-arena/index.html')">
+        <div class="continue-thumb thumb-arena game-thumb">
+          <div class="thumb-glyph">🌀</div>
+          <div class="thumb-overlay"></div>
+          <button class="thumb-play-btn">▶ PLAY</button>
+        </div>
+        <div class="game-card-body">
+          <div class="game-name">Cursed Arena</div>
+          <div class="game-meta">
+            <span class="game-genre">Top-Down</span>
+            <span class="game-rating">⭐ 4.7</span>
+          </div>
+        </div>
+      </div>
+      <div class="game-card continue-card" data-game="domain-defender" onclick="navigateToGame('games/domain-defender/index.html')">
+        <div class="continue-thumb thumb-defender game-thumb">
+          <div class="thumb-glyph">🏯</div>
+          <div class="thumb-overlay"></div>
+          <button class="thumb-play-btn">▶ PLAY</button>
+        </div>
+        <div class="game-card-body">
+          <div class="game-name">Domain Defender</div>
+          <div class="game-meta">
+            <span class="game-genre">Tower Defense</span>
+            <span class="game-rating">⭐ 4.6</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Popular Games Grid -->
+    <div class="section-header">
+      <div class="section-title">🔥 Popular Games</div>
+      <a class="section-see-all" href="#">See all</a>
+    </div>
+    <div class="games-grid" id="games-grid">
+
+      <div class="game-card grid-card" data-game="hunters" data-name="HUNTERS" onclick="navigateToGame('games/jujutsuhunters/hunters.html')">
+        <div class="game-thumb thumb-hunters">
+          <div class="thumb-glyph">⚔️</div>
+          <div class="thumb-overlay"></div>
+          <button class="thumb-play-btn">▶ PLAY</button>
+        </div>
+        <div class="game-card-body">
+          <div class="game-name">HUNTERS</div>
+          <div class="game-meta">
+            <span class="game-genre">FPS Combat</span>
+            <span class="game-players"><div class="online-dot"></div>1,247</span>
+            <span class="game-rating">⭐4.9</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="game-card grid-card" data-game="cursed-arena" data-name="Cursed Arena" onclick="navigateToGame('games/cursed-arena/index.html')">
+        <div class="game-thumb thumb-arena">
+          <div class="thumb-glyph">🌀</div>
+          <div class="thumb-overlay"></div>
+          <button class="thumb-play-btn">▶ PLAY</button>
+        </div>
+        <div class="game-card-body">
+          <div class="game-name">Cursed Arena</div>
+          <div class="game-meta">
+            <span class="game-genre">Top-Down Shooter</span>
+            <span class="game-players"><div class="online-dot"></div>892</span>
+            <span class="game-rating">⭐4.7</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="game-card grid-card" data-game="domain-defender" data-name="Domain Defender" onclick="navigateToGame('games/domain-defender/index.html')">
+        <div class="game-thumb thumb-defender">
+          <div class="thumb-glyph">🏯</div>
+          <div class="thumb-overlay"></div>
+          <button class="thumb-play-btn">▶ PLAY</button>
+        </div>
+        <div class="game-card-body">
+          <div class="game-name">Domain Defender</div>
+          <div class="game-meta">
+            <span class="game-genre">Tower Defense</span>
+            <span class="game-players"><div class="online-dot"></div>634</span>
+            <span class="game-rating">⭐4.6</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="game-card grid-card" data-game="grade-trials" data-name="Grade Trials" onclick="navigateToGame('games/grade-trials/index.html')">
+        <div class="game-thumb thumb-trials">
+          <div class="thumb-glyph">🎵</div>
+          <div class="thumb-overlay"></div>
+          <button class="thumb-play-btn">▶ PLAY</button>
+        </div>
+        <div class="game-card-body">
+          <div class="game-name">Grade Trials</div>
+          <div class="game-meta">
+            <span class="game-genre">Rhythm Combat</span>
+            <span class="game-players"><div class="online-dot"></div>418</span>
+            <span class="game-rating">⭐4.5</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="game-card grid-card" data-game="spirit-chase" data-name="Spirit Chase" onclick="navigateToGame('games/spirit-chase/index.html')">
+        <div class="game-thumb thumb-spirit">
+          <div class="thumb-glyph">👻</div>
+          <div class="thumb-overlay"></div>
+          <button class="thumb-play-btn">▶ PLAY</button>
+        </div>
+        <div class="game-card-body">
+          <div class="game-name">Spirit Chase</div>
+          <div class="game-meta">
+            <span class="game-genre">Horror Survival</span>
+            <span class="game-players"><div class="online-dot"></div>287</span>
+            <span class="game-rating">⭐4.4</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="game-card grid-card" data-game="culling-colony" data-name="Culling Colony" onclick="navigateToGame('games/culling-colony/index.html')">
+        <div class="game-thumb thumb-culling">
+          <div class="thumb-glyph">💀</div>
+          <div class="thumb-overlay"></div>
+          <button class="thumb-play-btn">▶ PLAY</button>
+        </div>
+        <div class="game-card-body">
+          <div class="game-name">Culling Colony</div>
+          <div class="game-meta">
+            <span class="game-genre">Battle Royale</span>
+            <span class="game-players"><div class="online-dot"></div>156</span>
+            <span class="game-rating">⭐4.3</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="game-card grid-card" data-game="sorcerers-path" data-name="Sorcerer's Path" onclick="navigateToGame('games/sorcerers-path/index.html')">
+        <div class="game-thumb thumb-sorcerer">
+          <div class="thumb-glyph">🗺️</div>
+          <div class="thumb-overlay"></div>
+          <button class="thumb-play-btn">▶ PLAY</button>
+        </div>
+        <div class="game-card-body">
+          <div class="game-name">Sorcerer's Path</div>
+          <div class="game-meta">
+            <span class="game-genre">RPG Adventure</span>
+            <span class="game-players"><div class="online-dot"></div>98</span>
+            <span class="game-rating">⭐4.2</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="game-card grid-card" data-game="binding-vow" data-name="Binding Vow" onclick="navigateToGame('games/binding-vow/index.html')">
+        <div class="game-thumb thumb-vow">
+          <div class="thumb-glyph">📜</div>
+          <div class="thumb-overlay"></div>
+          <button class="thumb-play-btn">▶ PLAY</button>
+        </div>
+        <div class="game-card-body">
+          <div class="game-name">Binding Vow</div>
+          <div class="game-meta">
+            <span class="game-genre">Strategy</span>
+            <span class="game-players"><div class="online-dot"></div>67</span>
+            <span class="game-rating">⭐4.1</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="game-card grid-card" data-game="infinite-void" data-name="Infinite Void" onclick="navigateToGame('games/infinite-void/index.html')">
+        <div class="game-thumb thumb-void">
+          <div class="thumb-glyph">🌌</div>
+          <div class="thumb-overlay"></div>
+          <button class="thumb-play-btn">▶ PLAY</button>
+        </div>
+        <div class="game-card-body">
+          <div class="game-name">Infinite Void</div>
+          <div class="game-meta">
+            <span class="game-genre">Domain Puzzle</span>
+            <span class="game-players"><div class="online-dot"></div>54</span>
+            <span class="game-rating">⭐4.0</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="game-card grid-card" data-game="reverse-cursed" data-name="Reverse Cursed" onclick="navigateToGame('games/reverse-cursed/index.html')">
+        <div class="game-thumb thumb-reverse">
+          <div class="thumb-glyph">💚</div>
+          <div class="thumb-overlay"></div>
+          <button class="thumb-play-btn">▶ PLAY</button>
+        </div>
+        <div class="game-card-body">
+          <div class="game-name">Reverse Cursed</div>
+          <div class="game-meta">
+            <span class="game-genre">Healing Tactical</span>
+            <span class="game-players"><div class="online-dot"></div>41</span>
+            <span class="game-rating">⭐3.9</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="game-card grid-card" data-game="sorcerer-quiz" data-name="Sorcerer Quiz" onclick="navigateToGame('games/sorcerer-quiz/index.html')">
+        <div class="game-thumb thumb-quiz">
+          <div class="thumb-glyph">🧠</div>
+          <div class="thumb-overlay"></div>
+          <button class="thumb-play-btn">▶ PLAY</button>
+        </div>
+        <div class="game-card-body">
+          <div class="game-name">Sorcerer Quiz</div>
+          <div class="game-meta">
+            <span class="game-genre">Trivia</span>
+            <span class="game-players"><div class="online-dot"></div>29</span>
+            <span class="game-rating">⭐3.8</span>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- New & Trending -->
+    <div class="section-header">
+      <div class="section-title">🆕 New &amp; Trending</div>
+      <a class="section-see-all" href="#">See all</a>
+    </div>
+    <div class="scroll-row">
+      <div class="game-card continue-card" data-name="Grade Trials" onclick="navigateToGame('games/grade-trials/index.html')">
+        <div class="continue-thumb thumb-trials game-thumb">
+          <div class="thumb-glyph">🎵</div>
+          <div class="new-badge">NEW</div>
+          <div class="thumb-overlay"></div>
+          <button class="thumb-play-btn">▶ PLAY</button>
+        </div>
+        <div class="game-card-body">
+          <div class="game-name">Grade Trials</div>
+          <div class="game-meta"><span class="game-genre">Rhythm Combat</span><span class="game-rating">⭐4.5</span></div>
+        </div>
+      </div>
+      <div class="game-card continue-card" data-name="Spirit Chase" onclick="navigateToGame('games/spirit-chase/index.html')">
+        <div class="continue-thumb thumb-spirit game-thumb">
+          <div class="thumb-glyph">👻</div>
+          <div class="new-badge">NEW</div>
+          <div class="thumb-overlay"></div>
+          <button class="thumb-play-btn">▶ PLAY</button>
+        </div>
+        <div class="game-card-body">
+          <div class="game-name">Spirit Chase</div>
+          <div class="game-meta"><span class="game-genre">Horror Survival</span><span class="game-rating">⭐4.4</span></div>
+        </div>
+      </div>
+      <div class="game-card continue-card" data-name="Culling Colony" onclick="navigateToGame('games/culling-colony/index.html')">
+        <div class="continue-thumb thumb-culling game-thumb">
+          <div class="thumb-glyph">💀</div>
+          <div class="new-badge">NEW</div>
+          <div class="thumb-overlay"></div>
+          <button class="thumb-play-btn">▶ PLAY</button>
+        </div>
+        <div class="game-card-body">
+          <div class="game-name">Culling Colony</div>
+          <div class="game-meta"><span class="game-genre">Battle Royale</span><span class="game-rating">⭐4.3</span></div>
+        </div>
+      </div>
+      <div class="game-card continue-card" data-name="Sorcerer's Path" onclick="navigateToGame('games/sorcerers-path/index.html')"><div class="continue-thumb thumb-sorcerer game-thumb">
+          <div class="thumb-glyph">🗺️</div>
+          <div class="new-badge">NEW</div>
+          <div class="thumb-overlay"></div>
+          <button class="thumb-play-btn">▶ PLAY</button>
+        </div>
+        <div class="game-card-body">
+          <div class="game-name">Sorcerer's Path</div>
+          <div class="game-meta"><span class="game-genre">RPG Adventure</span><span class="game-rating">⭐4.2</span></div>
+        </div>
+      </div>
+      <div class="game-card continue-card" data-name="Binding Vow" onclick="navigateToGame('games/binding-vow/index.html')">
+        <div class="continue-thumb thumb-vow game-thumb">
+          <div class="thumb-glyph">📜</div>
+          <div class="new-badge">NEW</div>
+          <div class="thumb-overlay"></div>
+          <button class="thumb-play-btn">▶ PLAY</button>
+        </div>
+        <div class="game-card-body">
+          <div class="game-name">Binding Vow</div>
+          <div class="game-meta"><span class="game-genre">Strategy</span><span class="game-rating">⭐4.1</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Weekly Leaderboard -->
+    <div class="section-header">
+      <div class="section-title">🏆 Weekly Leaderboard</div>
+      <a class="section-see-all" href="#">Full Rankings</a>
+    </div>
+    <div class="leaderboard-panel">
+      <div class="leaderboard-header">
+        <div class="leaderboard-title">🗓️ Week of April 21 – 27, 2026</div>
+        <span style="font-size:12px;color:var(--muted)">Resets in <span id="lb-timer" style="color:var(--accent2);font-weight:700">2d 14h</span></span>
+      </div>
+      <table class="leaderboard-table">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Player</th>
+            <th>Kills</th>
+            <th>Wins</th>
+            <th>NexusCoin</th>
+          </tr>
+        </thead>
+        <tbody id="lb-body">
+        </tbody>
+      </table>
+    </div>
+
+  </main>
+
+  <!-- ── RIGHT SIDEBAR ── -->
+  <aside class="sidebar-right">
+
+    <!-- Friend Activity -->
+    <div class="right-panel">
+      <div class="right-panel-header">
+        <span class="right-panel-title">Friend Activity</span>
+        <span style="font-size:11px;color:var(--success);font-weight:600">● LIVE</span>
+      </div>
+      <div class="right-panel-body">
+        <div class="activity-item">
+          <div class="activity-avatar" style="background:linear-gradient(135deg,#7c3aed,#06b6d4)">G</div>
+          <div class="activity-text">
+            <div class="activity-msg"><strong>Gojo_User</strong> started playing HUNTERS</div>
+            <div class="activity-time">Just now</div>
+          </div>
+        </div>
+        <div class="activity-item">
+          <div class="activity-avatar" style="background:linear-gradient(135deg,#dc2626,#7c3aed)">S</div>
+          <div class="activity-text">
+            <div class="activity-msg"><strong>SukunaFan</strong> won Domain Defender — 847 pts</div>
+            <div class="activity-time">3 min ago</div>
+          </div>
+        </div>
+        <div class="activity-item">
+          <div class="activity-avatar" style="background:linear-gradient(135deg,#059669,#06b6d4)">M</div>
+          <div class="activity-text">
+            <div class="activity-msg"><strong>MegumiFan</strong> unlocked Ten Shadows technique</div>
+            <div class="activity-time">12 min ago</div>
+          </div>
+        </div>
+        <div class="activity-item">
+          <div class="activity-avatar" style="background:linear-gradient(135deg,#d97706,#7c3aed)">N</div>
+          <div class="activity-text">
+            <div class="activity-msg"><strong>NobFan</strong> reached Grade 1 Sorcerer rank</div>
+            <div class="activity-time">28 min ago</div>
+          </div>
+        </div>
+        <div class="activity-item">
+          <div class="activity-avatar" style="background:linear-gradient(135deg,#0891b2,#7c3aed)">Y</div>
+          <div class="activity-text">
+            <div class="activity-msg"><strong>YujiItadori</strong> used Domain Expansion 3 times</div>
+            <div class="activity-time">1 hr ago</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Daily Challenges -->
+    <div class="right-panel">
+      <div class="right-panel-header">
+        <span class="right-panel-title">Daily Challenges</span>
+        <span class="challenge-timer" id="challenge-timer">14:23:41</span>
+      </div>
+      <div class="right-panel-body">
+        <div class="challenge-item">
+          <div class="challenge-header">
+            <span class="challenge-name">Win 3 matches</span>
+            <span class="challenge-progress-text">2/3</span>
+          </div>
+          <div class="progress-bar">
+            <div class="progress-fill" style="width:66.6%"></div>
+          </div>
+        </div>
+        <div class="challenge-item">
+          <div class="challenge-header">
+            <span class="challenge-name">Get 50 kills</span>
+            <span class="challenge-progress-text">12/50</span>
+          </div>
+          <div class="progress-bar">
+            <div class="progress-fill" style="width:24%"></div>
+          </div>
+        </div>
+        <div class="challenge-item">
+          <div class="challenge-header">
+            <span class="challenge-name">Use Domain Expansion</span>
+            <span class="challenge-progress-text">0/1</span>
+          </div>
+          <div class="progress-bar">
+            <div class="progress-fill" style="width:0%"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Nexus Pass -->
+    <div class="nexus-pass">
+      <div class="pass-label">Season 3</div>
+      <div class="pass-season">NEXUS PASS</div>
+      <div class="pass-bar">
+        <div class="pass-bar-bg">
+          <div class="pass-bar-fill"></div>
+        </div>
+      </div>
+      <div class="pass-meta">
+        <span class="pass-level">Level 31</span>
+        <span class="pass-xp">3,100 / 5,000 XP</span>
+      </div>
+      <button class="pass-upgrade-btn">⚡ UPGRADE PASS — 800 ⬡</button>
+    </div>
+
+  </aside>
+
+</div><!-- /page -->
+
+<!-- ══════════════════════════════════════════
+     PLAY NOW MODAL
+══════════════════════════════════════════ -->
+<div class="modal-overlay" id="modal-overlay">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title">Quick Launch</span>
+      <button class="modal-close" id="modal-close">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="modal-game-banner">
+        <div class="modal-game-title">HUNTERS</div>
+      </div>
+      <div class="connecting-status">
+        <div class="connecting-dot"></div>
+        <span class="connecting-text" id="connecting-text">Connecting to servers...</span>
+      </div>
+      <div class="modal-players-online">⚡ 1,247 players online now &nbsp;·&nbsp; Avg. wait: &lt;5s</div>
+      <div class="modal-footer">
+        <button class="btn-outline" id="modal-cancel">Cancel</button>
+        <button class="btn-primary" id="modal-launch" onclick="navigateToGame('games/jujutsuhunters/hunters.html')">▶ LAUNCH GAME</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ══════════════════════════════════════════
+//  PARTICLE BACKGROUND
+// ══════════════════════════════════════════
+(function () {
+  const canvas = document.getElementById('particle-canvas');
+  const ctx = canvas.getContext('2d');
+  let W, H, particles = [];
+
+  function resize() {
+    W = canvas.width = window.innerWidth;
+    H = canvas.height = window.innerHeight;
+  }
+
+  window.addEventListener('resize', resize);
+  resize();
+
+  function rand(min, max) { return Math.random() * (max - min) + min; }
+
+  function createParticle() {
+    return {
+      x: rand(0, W),
+      y: rand(H, H + 50),
+      r: rand(1, 2.5),
+      speed: rand(0.3, 0.8),
+      opacity: rand(0.2, 0.7),
+      color: Math.random() > 0.5 ? '124,58,237' : '6,182,212',
+      drift: rand(-0.3, 0.3),
+      pulse: rand(0, Math.PI * 2),
+      pulseSpeed: rand(0.01, 0.03),
+    };
+  }
+
+  for (let i = 0; i < 30; i++) {
+    const p = createParticle();
+    p.y = rand(0, H); // spread initial positions
+    particles.push(p);
+  }
+
+  function tick() {
+    ctx.clearRect(0, 0, W, H);
+    for (let i = 0; i < particles.length; i++) {
+      const p = particles[i];
+      p.y -= p.speed;
+      p.x += p.drift;
+      p.pulse += p.pulseSpeed;
+      const alpha = p.opacity * (0.7 + 0.3 * Math.sin(p.pulse));
+
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+      ctx.fillStyle = `rgba(${p.color},${alpha})`;
+      ctx.fill();
+
+      if (p.y < -10) {
+        particles[i] = createParticle();
+      }
+    }
+    requestAnimationFrame(tick);
+  }
+
+  tick();
+})();
+
+// ══════════════════════════════════════════
+//  LEADERBOARD DATA
+// ══════════════════════════════════════════
+const lbData = [
+  { name: 'Gojo_User',      initial: 'G', kills: 2847, wins: 143, coins: 12450, color: 'linear-gradient(135deg,#7c3aed,#06b6d4)' },
+  { name: 'SukunaFan',      initial: 'S', kills: 2614, wins: 128, coins: 10800, color: 'linear-gradient(135deg,#dc2626,#7c3aed)' },
+  { name: 'YujiItadori',    initial: 'Y', kills: 2391, wins: 114, coins:  9350, color: 'linear-gradient(135deg,#0891b2,#7c3aed)' },
+  { name: 'MegumiFan',      initial: 'M', kills: 2103, wins:  99, coins:  7900, color: 'linear-gradient(135deg,#059669,#06b6d4)' },
+  { name: 'NobFan',         initial: 'N', kills: 1876, wins:  87, coins:  6500, color: 'linear-gradient(135deg,#d97706,#7c3aed)' },
+  { name: 'CursedKing',     initial: 'C', kills: 1654, wins:  74, coins:  5100, color: 'linear-gradient(135deg,#7c3aed,#dc2626)' },
+  { name: 'RyomenMaster',   initial: 'R', kills: 1402, wins:  61, coins:  3950, color: 'linear-gradient(135deg,#4f46e5,#06b6d4)' },
+  { name: 'TenShadows',     initial: 'T', kills: 1188, wins:  53, coins:  3200, color: 'linear-gradient(135deg,#059669,#7c3aed)' },
+  { name: 'InfinityUser',   initial: 'I', kills:  934, wins:  41, coins:  2450, color: 'linear-gradient(135deg,#06b6d4,#4f46e5)' },
+  { name: 'BindingVow99',   initial: 'B', kills:  712, wins:  30, coins:  1800, color: 'linear-gradient(135deg,#0891b2,#059669)' },
+];
+
+const rankClasses = ['rank-1', 'rank-2', 'rank-3'];
+
+const tbody = document.getElementById('lb-body');
+lbData.forEach((p, i) => {
+  const rankClass = i < 3 ? rankClasses[i] : 'rank-other';
+  const medals = ['🥇', '🥈', '🥉'];
+  const rankDisplay = i < 3 ? medals[i] : (i + 1);
+  const tr = document.createElement('tr');
+  tr.innerHTML = `
+    <td><span class="rank-badge ${rankClass}">${rankDisplay}</span></td>
+    <td>
+      <div class="player-cell">
+        <div class="player-mini-avatar" style="background:${p.color}">${p.initial}</div>
+        ${p.name}
+      </div>
+    </td>
+    <td>${p.kills.toLocaleString()}</td>
+    <td>${p.wins}</td>
+    <td class="coin-earned">⬡ ${p.coins.toLocaleString()}</td>
+  `;
+  tbody.appendChild(tr);
+});
+
+// ══════════════════════════════════════════
+//  CHALLENGE TIMER COUNTDOWN
+// ══════════════════════════════════════════
+let challengeSecs = 14 * 3600 + 23 * 60 + 41;
+const timerEl = document.getElementById('challenge-timer');
+
+function updateTimer() {
+  if (challengeSecs <= 0) { challengeSecs = 24 * 3600; }
+  const h = Math.floor(challengeSecs / 3600);
+  const m = Math.floor((challengeSecs % 3600) / 60);
+  const s = challengeSecs % 60;
+  timerEl.textContent = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+  challengeSecs--;
+}
+
+updateTimer();
+setInterval(updateTimer, 1000);
+
+// ══════════════════════════════════════════
+//  SEARCH FILTER
+// ══════════════════════════════════════════
+document.getElementById('search-input').addEventListener('input', function () {
+  const q = this.value.trim().toLowerCase();
+  const cards = document.querySelectorAll('#games-grid .game-card');
+  cards.forEach(card => {
+    const name = (card.dataset.name || '').toLowerCase();
+    card.style.display = (!q || name.includes(q)) ? '' : 'none';
+  });
+});
+
+// ══════════════════════════════════════════
+//  SIDEBAR NAV ACTIVE STATE
+// ══════════════════════════════════════════
+document.querySelectorAll('.sidebar-nav-item[data-nav]').forEach(item => {
+  item.addEventListener('click', function () {
+    document.querySelectorAll('.sidebar-nav-item').forEach(i => i.classList.remove('active'));
+    this.classList.add('active');
+  });
+});
+
+// ══════════════════════════════════════════
+//  NOTIFICATION DROPDOWN
+// ══════════════════════════════════════════
+const bellBtn = document.getElementById('bell-btn');
+const notifDropdown = document.getElementById('notif-dropdown');
+
+bellBtn.addEventListener('click', function (e) {
+  e.stopPropagation();
+  notifDropdown.classList.toggle('open');
+  avatarDropdown.classList.remove('open');
+});
+
+// ══════════════════════════════════════════
+//  PROFILE AVATAR DROPDOWN
+// ══════════════════════════════════════════
+const avatarBtn = document.getElementById('avatar-btn');
+const avatarDropdown = document.getElementById('avatar-dropdown');
+
+avatarBtn.addEventListener('click', function (e) {
+  e.stopPropagation();
+  avatarDropdown.classList.toggle('open');
+  notifDropdown.classList.remove('open');
+});
+
+// Close dropdowns on outside click
+document.addEventListener('click', function () {
+  notifDropdown.classList.remove('open');
+  avatarDropdown.classList.remove('open');
+});
+
+// ══════════════════════════════════════════
+//  PLAY NOW MODAL
+// ══════════════════════════════════════════
+const modalOverlay = document.getElementById('modal-overlay');
+const connectingText = document.getElementById('connecting-text');
+
+const connectingStates = [
+  'Connecting to servers...',
+  'Finding match...',
+  'Joining cursed realm...',
+  'Ready — Launch when you are!',
+];
+
+let connectStep = 0;
+let connectInterval = null;
+
+function openModal() {
+  modalOverlay.classList.add('open');
+  connectStep = 0;
+  connectingText.textContent = connectingStates[0];
+  connectInterval = setInterval(() => {
+    connectStep++;
+    if (connectStep < connectingStates.length) {
+      connectingText.textContent = connectingStates[connectStep];
+    } else {
+      clearInterval(connectInterval);
+    }
+  }, 900);
+}
+
+function closeModal() {
+  modalOverlay.classList.remove('open');
+  clearInterval(connectInterval);
+}
+
+document.getElementById('nav-play-btn').addEventListener('click', openModal);
+document.getElementById('modal-close').addEventListener('click', closeModal);
+document.getElementById('modal-cancel').addEventListener('click', closeModal);
+modalOverlay.addEventListener('click', function (e) {
+  if (e.target === this) closeModal();
+});
+
+// ══════════════════════════════════════════
+//  GAME NAVIGATION
+// ══════════════════════════════════════════
+function navigateToGame(url) {
+  if (!url || url === '#') {
+    // Coming soon flash
+    const toast = document.createElement('div');
+    toast.textContent = '⚡ Coming Soon — Stay tuned!';
+    toast.style.cssText = `
+      position:fixed;bottom:24px;left:50%;transform:translateX(-50%);
+      background:linear-gradient(135deg,#7c3aed,#06b6d4);
+      color:#fff;padding:12px 24px;border-radius:6px;
+      font-size:13px;font-weight:700;z-index:9999;
+      box-shadow:0 4px 16px rgba(124,58,237,0.4);
+      animation:slideUp 0.2s ease;
+    `;
+    document.body.appendChild(toast);
+    setTimeout(() => toast.remove(), 2500);
+    return;
+  }
+  window.location.href = url;
+}
+
+// Slide-up animation for toast
+const style = document.createElement('style');
+style.textContent = `@keyframes slideUp { from { opacity:0; transform:translateX(-50%) translateY(12px); } to { opacity:1; transform:translateX(-50%) translateY(0); } }`;
+document.head.appendChild(style);
+
+// ══════════════════════════════════════════
+//  DYNAMIC STATS FROM LOCALSTORAGE
+// ══════════════════════════════════════════
+(function () {
+  // Base play counts (seeded so new installs aren't empty)
+  const BASE_PLAYS = {
+    'hunters': 1180,
+    'cursed-arena': 830,
+    'domain-defender': 590,
+    'grade-trials': 370,
+    'spirit-chase': 250,
+    'culling-colony': 130,
+    'sorcerers-path': 80,
+    'binding-vow': 55,
+    'infinite-void': 42,
+    'reverse-cursed': 30,
+    'sorcerer-quiz': 22,
+  };
+
+  // Base ratings (seeded averages × vote counts)
+  const BASE_RATINGS = {
+    'hunters':        { sum: 4.8 * 420, count: 420 },
+    'cursed-arena':   { sum: 4.6 * 310, count: 310 },
+    'domain-defender':{ sum: 4.5 * 240, count: 240 },
+    'grade-trials':   { sum: 4.4 * 180, count: 180 },
+    'spirit-chase':   { sum: 4.3 * 140, count: 140 },
+    'culling-colony': { sum: 4.2 * 95,  count: 95  },
+    'sorcerers-path': { sum: 4.1 * 60,  count: 60  },
+    'binding-vow':    { sum: 4.0 * 40,  count: 40  },
+    'infinite-void':  { sum: 3.9 * 28,  count: 28  },
+    'reverse-cursed': { sum: 3.8 * 20,  count: 20  },
+    'sorcerer-quiz':  { sum: 3.7 * 14,  count: 14  },
+  };
+
+  function getPlays(id) {
+    return (BASE_PLAYS[id] || 0) + parseInt(localStorage.getItem('nexus_plays_' + id) || '0');
+  }
+
+  function getRating(id) {
+    const base = BASE_RATINGS[id] || { sum: 0, count: 0 };
+    const votes = JSON.parse(localStorage.getItem('nexus_rating_' + id) || '[]');
+    const totalSum = base.sum + votes.reduce((a, b) => a + b, 0);
+    const totalCount = base.count + votes.length;
+    if (totalCount === 0) return '—';
+    return (totalSum / totalCount).toFixed(1);
+  }
+
+  function fmt(n) {
+    if (n >= 1000) return (n / 1000).toFixed(1).replace(/\.0$/, '') + 'k';
+    return n.toString();
+  }
+
+  // Update all game cards
+  document.querySelectorAll('.game-card[data-game]').forEach(card => {
+    const id = card.dataset.game;
+    const plays = getPlays(id);
+    const rating = getRating(id);
+
+    const playerEl = card.querySelector('.game-players');
+    if (playerEl) {
+      playerEl.innerHTML = `<div class="online-dot"></div>${fmt(plays)}`;
+    }
+    const ratingEl = card.querySelector('.game-rating');
+    if (ratingEl) {
+      ratingEl.textContent = `⭐${rating}`;
+    }
+  });
+
+  // Update featured banner player count
+  const featuredPlayers = document.querySelector('.featured-players');
+  if (featuredPlayers) {
+    const huntersPlays = getPlays('hunters');
+    featuredPlayers.innerHTML = `<div class="online-dot"></div>${fmt(huntersPlays)} playing now`;
+  }
+})();
+</script>
+</body>
+</html>

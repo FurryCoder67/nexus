@@ -1,0 +1,436 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>HUNTERS — Jujutsu Kaisen FPS</title>
+  <link rel="icon" href="favicon.svg" type="image/svg+xml" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&family=Orbitron:wght@700;900&display=swap" rel="stylesheet" />
+  <style>
+    .nexus-back{position:fixed;top:14px;left:16px;z-index:2000;
+      display:flex;align-items:center;gap:6px;
+      background:rgba(99,102,241,.15);border:1px solid rgba(99,102,241,.3);
+      color:#c7d2fe;padding:6px 14px;border-radius:8px;text-decoration:none;
+      font-size:.78rem;font-weight:700;letter-spacing:.06em;transition:all .15s;}
+    .nexus-back:hover{background:rgba(99,102,241,.3);color:#fff;}
+  </style>
+  <style>
+    *,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+    :root{
+      --p:#7c3aed;--p2:#2563eb;--cyan:#06b6d4;--red:#dc2626;
+      --bg:#030014;--surf:#0a051e;--text:#fff;--muted:#94a3b8;
+    }
+    html{scroll-behavior:smooth}
+    body{background:var(--bg);color:var(--text);font-family:'Inter',system-ui,sans-serif;overflow-x:hidden}
+    #root{min-height:100  vh}
+    @keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-12px)}}
+    @keyframes pulse-glow{0%,100%{opacity:.5}50%{opacity:1}}
+    @keyframes ticker{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+    @keyframes fade-up{from{opacity:0;transform:translateY(24px)}to{opacity:1;transform:translateY(0)}}
+    @keyframes spin-slow{to{transform:rotate(360deg)}}
+  </style>
+</head>
+<body>
+<a class="nexus-back" href="../../index.html">← NEXUS</a>
+<div id="root"></div>
+
+<!-- React 18 UMD -->
+<script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<!-- Babel standalone for JSX in browser -->
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+<script type="text/babel">
+const { useState, useEffect, useRef } = React;
+
+// ── Data ──────────────────────────────────────────────────────
+const WEAPONS = [
+  'Limitless: Blue','Hollow Purple','Malevolent Shrine','Dismantle','Cleave',
+  'Idle Transfiguration','Soul Punch','Divine Dogs','Nue Lightning','Great Serpent',
+  'Chimera Shadow Garden','Blood Manipulation','Ratio Technique','Overtime',
+  'Cursed Speech','Projection Sorcery','Rika: Slash','True Mutual Love',
+  'Unlimited Void','Shrine Flames','Body Repel','Straw Doll','Binding Vow',
+];
+
+const FEATURES = [
+  { icon:'⚡', title:'30+ Cursed Techniques', desc:'Limitless, Malevolent Shrine, Ten Shadows, Blood Manipulation and more — each with unique VFX and mastery progression.' },
+  { icon:'🗺️', title:'15+ Maps', desc:'Jujutsu High, Shibuya, Cursed Tomb, Space Station, Culling Arena — each procedurally detailed.' },
+  { icon:'👹', title:'9 JJK Bosses', desc:'Face Gojo, Sukuna, Mahito, Toji, Geto and more — each with unique abilities and domain expansions.' },
+  { icon:'🏃', title:'Walkable 3D Lobby', desc:'Explore a cursed ritual arena. Walk into portals to access Missions, Boss Hunt, Techniques, and the Market.' },
+  { icon:'📖', title:'JJK Storyline', desc:'Relive 5 arcs from the manga — Cursed Womb, Shibuya Incident, Culling Game and beyond.' },
+  { icon:'💰', title:'Progression & Mastery', desc:'Earn coins, unlock techniques, gain mastery levels through combat. Cloud saves keep progress synced.' },
+];
+
+const MODES = [
+  { icon:'☠️', name:'Extermination', desc:'Eliminate all cursed spirits' },
+  { icon:'🌊', name:'Domain Siege', desc:'Survive 5 escalating waves' },
+  { icon:'⏱️', name:'Cursed Hunt', desc:'Most kills in 2 minutes' },
+  { icon:'⚔️', name:'Culling Game', desc:'Merge with Tengen and dominate' },
+  { icon:'📖', name:'JJK Storyline', desc:'5-chapter campaign' },
+];
+
+const BOSSES = [
+  { name:'Satoru Gojo', color:'#88ccff', icon:'🔵', desc:'Six Eyes · Infinity · Unlimited Void' },
+  { name:'Ryomen Sukuna', color:'#ff4444', icon:'🔴', desc:'Malevolent Shrine · Dismantle · Cleave' },
+  { name:'Mahito', color:'#aa66ff', icon:'🟣', desc:'Idle Transfiguration · Soul Distortion' },
+  { name:'Toji Fushiguro', color:'#888', icon:'⚫', desc:'Heavenly Restriction · Inventory Curse' },
+  { name:'Suguru Geto', color:'#9933ff', icon:'🟤', desc:'Cursed Spirit Manipulation' },
+  { name:'Yuta Okkotsu', color:'#eee', icon:'⚪', desc:'Rika · Copy · Reverse Cursed Technique' },
+];
+
+// ── Components ────────────────────────────────────────────────
+
+function Nav() {
+  const [scrolled, setScrolled] = useState(false);
+  useEffect(() => {
+    const h = () => setScrolled(window.scrollY > 40);
+    window.addEventListener('scroll', h);
+    return () => window.removeEventListener('scroll', h);
+  }, []);
+  return (
+    <nav style={{
+      position:'fixed',top:0,left:0,right:0,zIndex:1000,
+      display:'flex',alignItems:'center',justifyContent:'space-between',
+      padding:'14px 32px',
+      background: scrolled ? 'rgba(3,0,20,0.92)' : 'transparent',
+      backdropFilter: scrolled ? 'blur(16px)' : 'none',
+      borderBottom: scrolled ? '1px solid rgba(124,58,237,.2)' : 'none',
+      transition:'all .3s',
+    }}>
+      <span style={{fontFamily:'Orbitron',fontWeight:900,fontSize:'1.2rem',
+        background:'linear-gradient(135deg,#fff,#c4b5fd)',
+        WebkitBackgroundClip:'text',WebkitTextFillColor:'transparent'}}>
+        HUNTERS
+      </span>
+      <div style={{display:'flex',gap:'28px',listStyle:'none'}}>
+        {['Features','Modes','Bosses','Download'].map(l => (
+          <a key={l} href={`#${l.toLowerCase()}`} style={{
+            color:'#94a3b8',textDecoration:'none',fontSize:'.88rem',
+            transition:'color .15s',fontWeight:600,
+          }}
+          onMouseEnter={e=>e.target.style.color='#fff'}
+          onMouseLeave={e=>e.target.style.color='#94a3b8'}>
+            {l}
+          </a>
+        ))}
+      </div>
+      <a href="hunters.html" style={{
+        background:'linear-gradient(135deg,#7c3aed,#2563eb)',
+        color:'#fff',padding:'9px 22px',borderRadius:'8px',
+        textDecoration:'none',fontWeight:700,fontSize:'.88rem',
+        boxShadow:'0 4px 20px rgba(124,58,237,.4)',
+      }}>
+        ▶ Play Now
+      </a>
+    </nav>
+  );
+}
+
+function Hero() {
+  return (
+    <section style={{
+      minHeight:'100vh',display:'flex',flexDirection:'column',
+      alignItems:'center',justifyContent:'center',textAlign:'center',
+      padding:'100px 20px 60px',position:'relative',overflow:'hidden',
+    }}>
+      {/* Background glows */}
+      <div style={{position:'absolute',inset:0,pointerEvents:'none',overflow:'hidden'}}>
+        <div style={{position:'absolute',top:'20%',left:'20%',width:'500px',height:'500px',
+          background:'radial-gradient(circle,rgba(124,58,237,.25) 0%,transparent 70%)',
+          borderRadius:'50%',filter:'blur(40px)',animation:'pulse-glow 4s ease-in-out infinite'}}/>
+        <div style={{position:'absolute',top:'30%',right:'15%',width:'400px',height:'400px',
+          background:'radial-gradient(circle,rgba(37,99,235,.2) 0%,transparent 70%)',
+          borderRadius:'50%',filter:'blur(40px)',animation:'pulse-glow 4s ease-in-out infinite',animationDelay:'2s'}}/>
+        <div style={{position:'absolute',bottom:'10%',left:'50%',transform:'translateX(-50%)',
+          width:'800px',height:'200px',
+          background:'radial-gradient(ellipse,rgba(124,58,237,.15) 0%,transparent 70%)',
+          filter:'blur(30px)'}}/>
+        {/* Scanlines */}
+        <div style={{position:'absolute',inset:0,
+          background:'repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(120,0,255,.012) 2px,rgba(120,0,255,.012) 3px)',
+          pointerEvents:'none'}}/>
+      </div>
+
+      <div style={{position:'relative',zIndex:2,maxWidth:'900px',animation:'fade-up .8s ease both'}}>
+        <div style={{
+          display:'inline-block',background:'rgba(124,58,237,.15)',
+          border:'1px solid rgba(124,58,237,.4)',color:'#c4b5fd',
+          fontSize:'.75rem',letterSpacing:'.15em',textTransform:'uppercase',
+          padding:'5px 16px',borderRadius:'999px',marginBottom:'24px',
+        }}>
+          ⚔️ Jujutsu Kaisen Universe
+        </div>
+
+        <h1 style={{
+          fontFamily:'Orbitron',fontWeight:900,
+          fontSize:'clamp(3.5rem,10vw,7.5rem)',
+          lineHeight:1,letterSpacing:'-.02em',marginBottom:'12px',
+          background:'linear-gradient(135deg,#fff 0%,#c4b5fd 40%,#7c3aed 100%)',
+          WebkitBackgroundClip:'text',WebkitTextFillColor:'transparent',
+        }}>
+          HUNTERS
+        </h1>
+
+        <p style={{fontSize:'clamp(1rem,2.5vw,1.3rem)',color:'#94a3b8',
+          marginBottom:'40px',lineHeight:1.7,maxWidth:'600px',margin:'0 auto 40px'}}>
+          A <span style={{color:'#c4b5fd',fontWeight:700}}>first-person shooter</span> set in the world of Jujutsu Kaisen.
+          Master cursed techniques, fight JJK bosses, and relive the saga.
+        </p>
+
+        <div style={{display:'flex',gap:'14px',justifyContent:'center',flexWrap:'wrap',marginBottom:'60px'}}>
+          <a href="hunters.html" style={{
+            display:'inline-flex',alignItems:'center',gap:'8px',
+            background:'linear-gradient(135deg,#7c3aed,#2563eb)',
+            color:'#fff',padding:'15px 32px',borderRadius:'10px',
+            textDecoration:'none',fontWeight:800,fontSize:'1rem',
+            boxShadow:'0 8px 32px rgba(124,58,237,.5)',
+            transition:'transform .15s,filter .15s',
+          }}
+          onMouseEnter={e=>{e.currentTarget.style.transform='translateY(-2px)';e.currentTarget.style.filter='brightness(1.1)'}}
+          onMouseLeave={e=>{e.currentTarget.style.transform='';e.currentTarget.style.filter=''}}>
+            ▶ Play in Browser
+          </a>
+          <a href="#download" style={{
+            display:'inline-flex',alignItems:'center',gap:'8px',
+            background:'rgba(255,255,255,.06)',border:'1px solid rgba(255,255,255,.15)',
+            color:'#fff',padding:'15px 32px',borderRadius:'10px',
+            textDecoration:'none',fontWeight:700,fontSize:'1rem',
+            transition:'transform .15s,background .15s',
+          }}
+          onMouseEnter={e=>{e.currentTarget.style.transform='translateY(-2px)';e.currentTarget.style.background='rgba(255,255,255,.1)'}}
+          onMouseLeave={e=>{e.currentTarget.style.transform='';e.currentTarget.style.background='rgba(255,255,255,.06)'}}>
+            ⬇ Download App
+          </a>
+        </div>
+
+        {/* Stats */}
+        <div style={{display:'flex',gap:'40px',justifyContent:'center',flexWrap:'wrap'}}>
+          {[['30+','Cursed Techniques'],['15+','Maps'],['5','Game Modes'],['9','JJK Bosses']].map(([n,l])=>(
+            <div key={l} style={{textAlign:'center'}}>
+              <div style={{fontFamily:'Orbitron',fontSize:'2.2rem',fontWeight:900,color:'#c4b5fd'}}>{n}</div>
+              <div style={{fontSize:'.78rem',color:'#94a3b8',letterSpacing:'.1em',textTransform:'uppercase'}}>{l}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function Ticker() {
+  const doubled = [...WEAPONS, ...WEAPONS];
+  return (
+    <div style={{overflow:'hidden',borderTop:'1px solid rgba(124,58,237,.2)',
+      borderBottom:'1px solid rgba(124,58,237,.2)',
+      padding:'12px 0',background:'rgba(124,58,237,.04)',margin:'0 0 80px'}}>
+      <div style={{display:'flex',gap:'48px',whiteSpace:'nowrap',
+        animation:'ticker 28s linear infinite'}}>
+        {doubled.map((w,i)=>(
+          <span key={i} style={{color:'#9d8ec4',fontSize:'.82rem',letterSpacing:'.06em'}}>
+            <span style={{color:'#7c3aed',marginRight:'6px'}}>⚡</span>{w}
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function Section({id, title, highlight, sub, children}) {
+  return (
+    <section id={id} style={{padding:'80px 20px',maxWidth:'1100px',margin:'0 auto'}}>
+      <div style={{marginBottom:'48px',textAlign:'center'}}>
+        <h2 style={{fontSize:'clamp(1.8rem,4vw,2.6rem)',fontWeight:900,marginBottom:'10px'}}>
+          {title} <span style={{color:'#7c3aed'}}>{highlight}</span>
+        </h2>
+        {sub && <p style={{color:'#94a3b8',fontSize:'1.05rem'}}>{sub}</p>}
+      </div>
+      {children}
+    </section>
+  );
+}
+
+function Card({style, children, hover=true}) {
+  const [hov, setHov] = useState(false);
+  return (
+    <div
+      onMouseEnter={()=>hover&&setHov(true)}
+      onMouseLeave={()=>hover&&setHov(false)}
+      style={{
+        background:'rgba(10,5,30,.8)',
+        border:`1px solid ${hov?'rgba(124,58,237,.6)':'rgba(124,58,237,.15)'}`,
+        borderRadius:'14px',padding:'24px',
+        transform: hov ? 'translateY(-4px)' : 'none',
+        transition:'all .2s',
+        ...style,
+      }}>
+      {children}
+    </div>
+  );
+}
+
+function Features() {
+  return (
+    <Section id="features" title="Everything you need to" highlight="dominate">
+      <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(300px,1fr))',gap:'20px'}}>
+        {FEATURES.map(f=>(
+          <Card key={f.title}>
+            <div style={{fontSize:'2rem',marginBottom:'12px'}}>{f.icon}</div>
+            <h3 style={{fontSize:'1.05rem',fontWeight:800,marginBottom:'8px'}}>{f.title}</h3>
+            <p style={{color:'#94a3b8',fontSize:'.9rem',lineHeight:1.6}}>{f.desc}</p>
+          </Card>
+        ))}
+      </div>
+    </Section>
+  );
+}
+
+function Modes() {
+  return (
+    <Section id="modes" title="Five ways to" highlight="fight" sub="Pick your battlefield and difficulty — Easy to Extreme.">
+      <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(180px,1fr))',gap:'16px'}}>
+        {MODES.map(m=>(
+          <Card key={m.name} style={{textAlign:'center'}}>
+            <div style={{fontSize:'2.2rem',marginBottom:'10px'}}>{m.icon}</div>
+            <div style={{fontWeight:800,marginBottom:'6px'}}>{m.name}</div>
+            <div style={{color:'#94a3b8',fontSize:'.82rem'}}>{m.desc}</div>
+          </Card>
+        ))}
+      </div>
+    </Section>
+  );
+}
+
+function Bosses() {
+  return (
+    <Section id="bosses" title="Face the" highlight="strongest" sub="9 JJK bosses with unique abilities, domain expansions, and cursed techniques.">
+      <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(260px,1fr))',gap:'16px'}}>
+        {BOSSES.map(b=>(
+          <Card key={b.name}>
+            <div style={{display:'flex',alignItems:'center',gap:'12px',marginBottom:'10px'}}>
+              <span style={{fontSize:'1.8rem'}}>{b.icon}</span>
+              <div>
+                <div style={{fontWeight:800,color:b.color,fontSize:'1rem'}}>{b.name}</div>
+                <div style={{fontSize:'.75rem',color:'#94a3b8',marginTop:'2px'}}>{b.desc}</div>
+              </div>
+            </div>
+            <div style={{height:'3px',background:'rgba(255,255,255,.06)',borderRadius:'2px',overflow:'hidden'}}>
+              <div style={{height:'100%',width:'100%',background:`linear-gradient(90deg,${b.color},transparent)`,borderRadius:'2px'}}/>
+            </div>
+          </Card>
+        ))}
+      </div>
+    </Section>
+  );
+}
+
+function Download() {
+  const [os, setOs] = useState('win');
+  useEffect(()=>{
+    const ua = navigator.userAgent;
+    if (/Mac/i.test(ua)) setOs('mac');
+    else if (/Linux/i.test(ua)) setOs('linux');
+  },[]);
+
+  const platforms = [
+    { id:'win', icon:'🪟', name:'Windows', sub:'.exe installer' },
+    { id:'mac', icon:'🍎', name:'macOS', sub:'.dmg installer' },
+    { id:'linux', icon:'🐧', name:'Linux', sub:'.AppImage' },
+  ];
+
+  return (
+    <section id="download" style={{padding:'80px 20px'}}>
+      <div style={{
+        maxWidth:'900px',margin:'0 auto',
+        background:'rgba(10,5,30,.9)',
+        border:'1px solid rgba(124,58,237,.3)',
+        borderRadius:'20px',padding:'60px 40px',textAlign:'center',
+        position:'relative',overflow:'hidden',
+      }}>
+        <div style={{position:'absolute',inset:0,pointerEvents:'none',
+          background:'radial-gradient(ellipse at 30% 50%,rgba(124,58,237,.12) 0%,transparent 60%),radial-gradient(ellipse at 70% 50%,rgba(37,99,235,.1) 0%,transparent 60%)'}}/>
+        <div style={{position:'relative',zIndex:1}}>
+          <h2 style={{fontSize:'clamp(1.8rem,4vw,2.8rem)',fontWeight:900,marginBottom:'12px'}}>
+            Download <span style={{color:'#7c3aed'}}>HUNTERS</span>
+          </h2>
+          <p style={{color:'#94a3b8',marginBottom:'36px',fontSize:'1.05rem'}}>
+            Install the desktop app — loads the latest version automatically every launch.
+          </p>
+
+          <div style={{display:'flex',gap:'14px',justifyContent:'center',flexWrap:'wrap',marginBottom:'32px'}}>
+            {platforms.map(p=>(
+              <a key={p.id} href="#build" style={{
+                display:'flex',flexDirection:'column',alignItems:'center',gap:'6px',
+                padding:'18px 28px',minWidth:'140px',
+                background: os===p.id ? 'rgba(124,58,237,.25)' : 'rgba(255,255,255,.05)',
+                border: `1px solid ${os===p.id ? 'rgba(124,58,237,.7)' : 'rgba(255,255,255,.1)'}`,
+                borderRadius:'12px',textDecoration:'none',color:'#fff',
+                transition:'all .2s',
+              }}
+              onMouseEnter={e=>{e.currentTarget.style.background='rgba(124,58,237,.2)';e.currentTarget.style.transform='translateY(-2px)'}}
+              onMouseLeave={e=>{e.currentTarget.style.background=os===p.id?'rgba(124,58,237,.25)':'rgba(255,255,255,.05)';e.currentTarget.style.transform=''}}>
+                <span style={{fontSize:'2rem'}}>{p.icon}</span>
+                <span style={{fontWeight:700,fontSize:'.95rem'}}>{p.name}</span>
+                <span style={{fontSize:'.72rem',color:'#94a3b8'}}>{p.sub}</span>
+              </a>
+            ))}
+          </div>
+
+          <div id="build" style={{
+            background:'rgba(0,0,0,.4)',border:'1px solid rgba(124,58,237,.2)',
+            borderRadius:'12px',padding:'24px',textAlign:'left',
+            fontFamily:'monospace',fontSize:'.88rem',lineHeight:2.2,
+            marginBottom:'20px',
+          }}>
+            <div style={{color:'#94a3b8'}}># Install dependencies</div>
+            <div style={{color:'#c4b5fd'}}>npm install</div>
+            <div style={{color:'#94a3b8',marginTop:'4px'}}># Run in dev mode</div>
+            <div style={{color:'#c4b5fd'}}>npm start</div>
+            <div style={{color:'#94a3b8',marginTop:'4px'}}># Build installer</div>
+            <div style={{color:'#c4b5fd'}}>npm run dist:win</div>
+          </div>
+
+          <p style={{fontSize:'.82rem',color:'#94a3b8'}}>
+            Built with <a href="https://www.electronjs.org/" target="_blank" style={{color:'#c4b5fd'}}>Electron</a> · Requires Node.js 18+ · Auto-syncs with every push
+          </p>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function Footer() {
+  return (
+    <footer style={{
+      borderTop:'1px solid rgba(255,255,255,.06)',
+      padding:'32px 20px',textAlign:'center',color:'#94a3b8',fontSize:'.85rem',
+    }}>
+      <div style={{marginBottom:'8px',fontFamily:'Orbitron',fontWeight:700,
+        background:'linear-gradient(135deg,#fff,#c4b5fd)',
+        WebkitBackgroundClip:'text',WebkitTextFillColor:'transparent',
+        display:'inline-block'}}>HUNTERS</div>
+      <div>Jujutsu Kaisen FPS · Built with Three.js &amp; Electron</div>
+      <div style={{marginTop:'6px',fontSize:'.75rem',opacity:.5}}>Fan project · Not affiliated with Gege Akutami or MAPPA</div>
+    </footer>
+  );
+}
+
+function App() {
+  return (
+    <>
+      <Nav />
+      <Hero />
+      <Ticker />
+      <Features />
+      <Modes />
+      <Bosses />
+      <Download />
+      <Footer />
+    </>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>

@@ -1,0 +1,804 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DOMAIN DEFENDER — NEXUS</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    background:#0a0a1a;
+    color:#fff;
+    font-family:'Courier New',monospace;
+    overflow:hidden;
+    user-select:none;
+  }
+  #header {
+    position:fixed; top:0; left:0; right:0; height:44px;
+    background:rgba(0,0,0,0.9);
+    border-bottom:1px solid #0a1a3a;
+    display:flex; align-items:center; justify-content:space-between;
+    padding:0 16px; z-index:100;
+  }
+  .logo { font-size:13px; font-weight:bold; color:#a855f7; letter-spacing:3px; text-decoration:none; }
+  .game-name { font-size:14px; font-weight:bold; color:#e2e8f0; letter-spacing:2px; }
+  .home-btn {
+    background:none; border:1px solid #1a2a5a; color:#60a5fa;
+    padding:4px 12px; cursor:pointer; font-family:inherit; font-size:12px;
+    letter-spacing:1px; text-decoration:none; display:inline-block;
+    transition:all 0.2s;
+  }
+  .home-btn:hover { background:#1a2a5a; color:#fff; }
+  #ui {
+    position:fixed; bottom:0; left:0; right:0; height:110px;
+    background:rgba(5,5,20,0.97);
+    border-top:1px solid #0a1a3a;
+    z-index:50;
+    display:flex; align-items:center; padding:0 16px; gap:16px;
+  }
+  #towerPanel {
+    display:flex; gap:10px; align-items:center;
+  }
+  .tower-btn {
+    background:#05051a; border:1px solid #1a2a5a;
+    border-radius:6px; padding:8px 12px; cursor:pointer;
+    text-align:center; transition:all 0.2s; min-width:76px;
+  }
+  .tower-btn:hover { border-color:#60a5fa; background:#0a0a2a; }
+  .tower-btn.selected { border-color:#a855f7; background:#1a0a2a; box-shadow:0 0 12px rgba(168,85,247,0.4); }
+  .tower-btn.locked { opacity:0.4; cursor:not-allowed; }
+  .tower-btn .tower-icon { font-size:22px; margin-bottom:3px; }
+  .tower-btn .tower-name { font-size:9px; color:#a0aec0; letter-spacing:1px; }
+  .tower-btn .tower-cost { font-size:10px; color:#60a5fa; margin-top:2px; }
+  #stats {
+    margin-left:auto; text-align:right; display:flex; flex-direction:column; gap:4px;
+  }
+  .stat-row { font-size:12px; color:#a0aec0; letter-spacing:1px; }
+  .stat-val { color:#e2e8f0; font-weight:bold; }
+  #waveBtn {
+    background:#0a1a3a; border:1px solid #60a5fa;
+    color:#60a5fa; padding:10px 20px; cursor:pointer;
+    font-family:inherit; font-size:12px; letter-spacing:2px;
+    transition:all 0.2s; white-space:nowrap;
+  }
+  #waveBtn:hover { background:#1a2a5a; color:#fff; }
+  #waveBtn:disabled { opacity:0.5; cursor:not-allowed; }
+  #overlay {
+    display:flex; position:fixed; top:0; left:0; right:0; bottom:0;
+    background:rgba(0,0,5,0.96); z-index:300;
+    justify-content:center; align-items:center; flex-direction:column; gap:16px;
+  }
+  #overlay h1 { font-size:36px; color:#a855f7; letter-spacing:5px; text-shadow:0 0 30px #a855f7; }
+  #overlay .sub { font-size:13px; color:#888; letter-spacing:2px; }
+  #overlay .score-display { font-size:20px; color:#e2e8f0; }
+  .btn {
+    background:#1a0a2a; border:1px solid #a855f7; color:#fff;
+    padding:11px 28px; cursor:pointer; font-family:inherit; font-size:13px;
+    letter-spacing:3px; transition:all 0.2s; margin-top:8px; text-decoration:none;
+    display:inline-block; text-align:center;
+  }
+  .btn:hover { background:#4a1a6a; box-shadow:0 0 16px rgba(168,85,247,0.5); }
+  #bannerMsg {
+    display:none; position:fixed; top:60px; left:50%; transform:translateX(-50%);
+    z-index:200; pointer-events:none;
+    background:rgba(0,0,0,0.85); border:1px solid #a855f7;
+    padding:10px 30px; border-radius:4px;
+  }
+  #bannerMsg.visible { display:block; }
+  #bannerMsg span { font-size:18px; color:#a855f7; letter-spacing:3px; text-shadow:0 0 12px #a855f7; }
+  #tooltip {
+    display:none; position:fixed; z-index:400;
+    background:rgba(5,5,25,0.97); border:1px solid #1a2a5a;
+    padding:8px 12px; border-radius:4px; pointer-events:none;
+    font-size:11px; color:#a0aec0; max-width:180px;
+  }
+  #ceBar {
+    position:fixed; top:44px; left:0; right:0; height:28px;
+    background:rgba(0,0,10,0.9); border-bottom:1px solid #0a1a3a;
+    display:flex; align-items:center; justify-content:space-between;
+    padding:0 14px; z-index:90;
+    font-size:12px; letter-spacing:1px;
+  }
+</style>
+</head>
+<body>
+<div id="header">
+  <a href="../../index.html" class="logo">NEXUS</a>
+  <span class="game-name">DOMAIN DEFENDER</span>
+  <a href="../../index.html" class="home-btn">&#8962; HOME</a>
+</div>
+
+<div id="ceBar">
+  <span>CURSED ENERGY: <span id="ceVal" style="color:#60a5fa;font-weight:bold">150</span></span>
+  <span>LIVES: <span id="livesVal" style="color:#ff4466;font-weight:bold">10</span> &nbsp;♥</span>
+  <span>WAVE: <span id="waveVal" style="color:#a855f7;font-weight:bold">0/15</span></span>
+  <span>SCORE: <span id="scoreVal" style="color:#ffcc00;font-weight:bold">0</span></span>
+</div>
+
+<canvas id="gameCanvas" style="display:block;position:fixed;top:72px;left:0;"></canvas>
+
+<div id="ui">
+  <div style="font-size:10px;color:#555;letter-spacing:1px;writing-mode:vertical-rl;transform:rotate(180deg)">SORCERERS</div>
+  <div id="towerPanel"></div>
+  <button id="waveBtn" onclick="startWave()">START WAVE 1</button>
+  <div id="stats">
+    <div class="stat-row">KILLS: <span class="stat-val" id="killsVal">0</span></div>
+    <div class="stat-row">BEST: <span class="stat-val" id="bestVal">0</span></div>
+    <div class="stat-row" style="font-size:10px;color:#444">CLICK cell to place</div>
+  </div>
+</div>
+
+<div id="bannerMsg"><span id="bannerText"></span></div>
+<div id="tooltip"></div>
+
+<div id="overlay">
+  <h1>DOMAIN DEFENDER</h1>
+  <div class="sub">PLACE SORCERERS — STOP THE CURSED SPIRITS</div>
+  <div class="sub" style="color:#60a5fa">CLICK A SORCERER BELOW, THEN CLICK A GRID CELL</div>
+  <div class="sub" style="color:#555">15 WAVES &nbsp;|&nbsp; 10 LIVES &nbsp;|&nbsp; EARN CE PER KILL</div>
+  <div id="startHiBest" style="color:#ffcc00;font-size:13px;">BEST SCORE: 0</div>
+  <button class="btn" onclick="initGame()">START GAME</button>
+</div>
+
+<script>
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+const HEADER_H = 72; // header + CE bar
+const UI_H = 110;
+const TOOLTIP_EL = document.getElementById('tooltip');
+
+// ─── Tower definitions ─────────────────────────────────────────────────────
+const TOWER_DEFS = [
+  { id:'yuji',    name:'YUJI',    icon:'🟢', cost:50,  dmg:12,  rate:0.5,  range:80,  color:'#22c55e', unlockWave:1,
+    desc:'Fast, cheap. Basic cursed energy punches.', special:'none' },
+  { id:'megumi',  name:'MEGUMI',  icon:'🔵', cost:100, dmg:22,  rate:1.1,  range:100, color:'#3b82f6', unlockWave:2,
+    desc:'Shadow summon — periodically places a temp turret nearby.', special:'shadow' },
+  { id:'nanami',  name:'NANAMI',  icon:'🟡', cost:120, dmg:20,  rate:1.0,  range:90,  color:'#eab308', unlockWave:3,
+    desc:'Ratio: every 7th hit deals 3× damage.', special:'ratio' },
+  { id:'gojo',    name:'GOJO',    icon:'⚪', cost:250, dmg:55,  rate:1.5,  range:140, color:'#93c5fd', unlockWave:5,
+    desc:'Infinity — high damage + slows enemies on hit.', special:'slow' },
+  { id:'sukuna',  name:'SUKUNA', icon:'🔴', cost:400, dmg:80,  rate:1.8,  range:110, color:'#ef4444', unlockWave:8,
+    desc:'Malevolent Shrine — AoE slash hits ALL enemies in range.', special:'aoe' },
+];
+
+// ─── Path waypoints (canvas coords, relative to game area) ────────────────
+let PATH_PTS = [];
+const GRID_CELL = 44;
+let COLS, ROWS;
+let CANVAS_H;
+
+// Projectile, enemy, tower, particle arrays
+let towers = [], enemies = [], projectiles = [], particles = [], floatTexts = [];
+let grid = []; // grid[row][col] = { hasPath, hasTower, tower }
+let ce, lives, wave, score, kills, waveActive, waveTimer;
+let selectedTower = null;
+let animId, lastTs;
+let gamePhase = 'idle'; // idle | playing | gameover | victory
+
+function resize() {
+  canvas.width = window.innerWidth;
+  CANVAS_H = window.innerHeight - HEADER_H - UI_H;
+  canvas.height = CANVAS_H;
+  buildGrid();
+  buildPath();
+}
+
+function buildGrid() {
+  COLS = Math.floor(canvas.width / GRID_CELL);
+  ROWS = Math.floor(CANVAS_H / GRID_CELL);
+  grid = [];
+  for (let r=0;r<ROWS;r++) {
+    grid[r] = [];
+    for (let c=0;c<COLS;c++) grid[r][c] = { hasPath:false, hasTower:false, tower:null };
+  }
+}
+
+function buildPath() {
+  // Define path as fraction of canvas dimensions
+  const W = canvas.width, H = CANVAS_H;
+  const raw = [
+    [0, 0.35],[0.15,0.35],[0.15,0.15],[0.35,0.15],[0.35,0.55],
+    [0.22,0.55],[0.22,0.75],[0.5,0.75],[0.5,0.45],[0.65,0.45],
+    [0.65,0.2],[0.82,0.2],[0.82,0.65],[0.68,0.65],[0.68,0.85],
+    [1.0,0.85]
+  ];
+  PATH_PTS = raw.map(([fx,fy]) => ({ x: fx*W, y: fy*H }));
+
+  // Mark grid cells on path
+  for (let r=0;r<ROWS;r++) for (let c=0;c<COLS;c++) grid[r][c].hasPath = false;
+  for (let i=0;i<PATH_PTS.length-1;i++) {
+    const a = PATH_PTS[i], b = PATH_PTS[i+1];
+    const steps = Math.ceil(Math.sqrt((b.x-a.x)**2+(b.y-a.y)**2)/10);
+    for (let s=0;s<=steps;s++) {
+      const px = a.x+(b.x-a.x)*s/steps;
+      const py = a.y+(b.y-a.y)*s/steps;
+      const c2 = Math.floor(px/GRID_CELL), r2 = Math.floor(py/GRID_CELL);
+      if (r2>=0&&r2<ROWS&&c2>=0&&c2<COLS) grid[r2][c2].hasPath = true;
+    }
+  }
+  // Also mark 1 cell wide buffer
+  const pathCopy = grid.map(row=>row.map(c=>({...c})));
+  for (let r=0;r<ROWS;r++) for (let c=0;c<COLS;c++) {
+    if (pathCopy[r][c].hasPath) {
+      for (let dr=-1;dr<=1;dr++) for (let dc=-1;dc<=1;dc++) {
+        const nr=r+dr, nc=c+dc;
+        if (nr>=0&&nr<ROWS&&nc>=0&&nc<COLS) grid[nr][nc].hasPath = true;
+      }
+    }
+  }
+}
+
+window.addEventListener('resize', resize);
+
+// ─── Init ─────────────────────────────────────────────────────────────────
+function initGame() {
+  resize();
+  ce = 150; lives = 10; wave = 0; score = 0; kills = 0;
+  waveActive = false; waveTimer = 0;
+  towers = []; enemies = []; projectiles = []; particles = []; floatTexts = [];
+  selectedTower = null;
+  gamePhase = 'playing';
+  document.getElementById('overlay').style.display = 'none';
+  buildTowerPanel();
+  updateHUD();
+  if (animId) cancelAnimationFrame(animId);
+  lastTs = performance.now();
+  animId = requestAnimationFrame(loop);
+}
+
+function buildTowerPanel() {
+  const panel = document.getElementById('towerPanel');
+  panel.innerHTML = '';
+  TOWER_DEFS.forEach(def => {
+    const btn = document.createElement('div');
+    btn.className = 'tower-btn' + (def.unlockWave > 1 ? ' locked' : '');
+    btn.id = 'tbtn-'+def.id;
+    btn.innerHTML = `<div class="tower-icon">${def.icon}</div><div class="tower-name">${def.name}</div><div class="tower-cost">${def.cost} CE</div>`;
+    btn.onclick = () => selectTower(def.id);
+    btn.addEventListener('mouseenter', e => showTooltip(e, def));
+    btn.addEventListener('mouseleave', hideTooltip);
+    panel.appendChild(btn);
+  });
+}
+
+function showTooltip(e, def) {
+  TOOLTIP_EL.style.display = 'block';
+  TOOLTIP_EL.style.left = e.clientX + 'px';
+  TOOLTIP_EL.style.top = (e.clientY - 80) + 'px';
+  TOOLTIP_EL.innerHTML = `<b style="color:${def.color}">${def.name}</b><br>${def.desc}<br><span style="color:#60a5fa">Range: ${def.range}px | DMG: ${def.dmg} | Rate: ${def.rate.toFixed(1)}/s</span><br><span style="color:#eab308">Cost: ${def.cost} CE</span>`;
+}
+function hideTooltip() { TOOLTIP_EL.style.display = 'none'; }
+
+function selectTower(id) {
+  const def = TOWER_DEFS.find(d=>d.id===id);
+  if (wave < def.unlockWave) { showBanner(`UNLOCKS WAVE ${def.unlockWave}`, 1500); return; }
+  if (ce < def.cost) { showBanner('NOT ENOUGH CURSED ENERGY', 1500); return; }
+  selectedTower = id;
+  document.querySelectorAll('.tower-btn').forEach(b=>b.classList.remove('selected'));
+  document.getElementById('tbtn-'+id).classList.add('selected');
+}
+
+// ─── Canvas click → place tower ──────────────────────────────────────────
+canvas.addEventListener('click', e => {
+  if (gamePhase !== 'playing') return;
+  const rect = canvas.getBoundingClientRect();
+  const mx = e.clientX - rect.left, my = e.clientY - rect.top;
+  const col = Math.floor(mx/GRID_CELL), row = Math.floor(my/GRID_CELL);
+  if (row<0||row>=ROWS||col<0||col>=COLS) return;
+  const cell = grid[row][col];
+  if (cell.hasPath) { showBanner('CAN\'T PLACE ON PATH', 1200); return; }
+  if (cell.hasTower) { showBanner('CELL OCCUPIED', 1000); return; }
+  if (!selectedTower) { showBanner('SELECT A SORCERER FIRST', 1200); return; }
+  const def = TOWER_DEFS.find(d=>d.id===selectedTower);
+  if (ce < def.cost) { showBanner('NOT ENOUGH CURSED ENERGY', 1500); return; }
+  ce -= def.cost;
+  placeTower(def, row, col);
+  updateHUD();
+});
+
+canvas.addEventListener('mousemove', e => {
+  if (gamePhase !== 'playing') return;
+  const rect = canvas.getBoundingClientRect();
+  const mx = e.clientX - rect.left, my = e.clientY - rect.top;
+  hoverCell = { col:Math.floor(mx/GRID_CELL), row:Math.floor(my/GRID_CELL), x:mx, y:my };
+});
+canvas.addEventListener('mouseleave', () => { hoverCell = null; });
+let hoverCell = null;
+
+function placeTower(def, row, col) {
+  const cx = col*GRID_CELL + GRID_CELL/2;
+  const cy = row*GRID_CELL + GRID_CELL/2;
+  const tower = {
+    id:def.id, def, row, col, x:cx, y:cy,
+    cooldown:0, hitCount:0, shadowTimer:0,
+    shadows:[],
+  };
+  grid[row][col].hasTower = true;
+  grid[row][col].tower = tower;
+  towers.push(tower);
+}
+
+// ─── Wave spawning ────────────────────────────────────────────────────────
+const ENEMY_TYPES = [
+  { id:'spirit', name:'Cursed Spirit',   r:10, hp:40,  speed:50,  color:'#7c3aed', xp:10, slow:0 },
+  { id:'bearer', name:'Finger Bearer',   r:15, hp:120, speed:35,  color:'#b45309', xp:25, slow:0 },
+  { id:'special',name:'Special Grade',   r:13, hp:80,  speed:75,  color:'#9f1239', xp:40, slow:0 },
+  { id:'boss',   name:'Special Grade+',  r:20, hp:300, speed:28,  color:'#6b21a8', xp:80, slow:0 },
+];
+
+function getWaveEnemies(w) {
+  const list = [];
+  const n = 5 + w*2;
+  const bearerFrom = 3, specialFrom = 5, bossFrom = 8;
+  for (let i=0;i<n;i++) {
+    let roll = Math.random();
+    let type;
+    if (w>=bossFrom && roll < 0.1) type = 'boss';
+    else if (w>=specialFrom && roll < 0.25) type = 'special';
+    else if (w>=bearerFrom && roll < 0.45) type = 'bearer';
+    else type = 'spirit';
+    list.push(type);
+  }
+  return list;
+}
+
+let spawnQueue = [], spawnInterval = 0, spawnTimer = 0;
+
+function startWave() {
+  if (waveActive) return;
+  if (wave >= 15) return;
+  wave++;
+  waveActive = true;
+  const wBtn = document.getElementById('waveBtn');
+  wBtn.disabled = true;
+  wBtn.textContent = 'WAVE IN PROGRESS';
+  showBanner(`WAVE ${wave} — BEGIN`, 2000);
+  updateHUD();
+  unlockTowers();
+
+  const types = getWaveEnemies(wave);
+  spawnQueue = [...types];
+  spawnInterval = Math.max(0.6, 1.8 - wave*0.07);
+  spawnTimer = 0;
+}
+
+function unlockTowers() {
+  TOWER_DEFS.forEach(def => {
+    if (wave >= def.unlockWave) {
+      const btn = document.getElementById('tbtn-'+def.id);
+      if (btn) btn.classList.remove('locked');
+    }
+  });
+}
+
+function spawnEnemy(typeId) {
+  const base = ENEMY_TYPES.find(e=>e.id===typeId);
+  const scl = 1 + (wave-1)*0.12;
+  const e = {
+    ...base,
+    hp: Math.round(base.hp*scl), maxHp: Math.round(base.hp*scl),
+    speed: base.speed*(1+wave*0.03),
+    slow: 0, slowTimer: 0,
+    pathIdx: 0, t: 0,
+    x: PATH_PTS[0].x, y: PATH_PTS[0].y,
+    dead: false, alpha: 1, fadeTimer: 0,
+  };
+  enemies.push(e);
+}
+
+// ─── Main Loop ────────────────────────────────────────────────────────────
+function loop(ts) {
+  animId = requestAnimationFrame(loop);
+  const dt = Math.min((ts-lastTs)/1000, 0.05);
+  lastTs = ts;
+  if (gamePhase !== 'playing') return;
+  update(dt);
+  draw();
+}
+
+function update(dt) {
+  // Spawn enemies
+  if (waveActive && spawnQueue.length > 0) {
+    spawnTimer -= dt;
+    if (spawnTimer <= 0) {
+      spawnEnemy(spawnQueue.shift());
+      spawnTimer = spawnInterval;
+    }
+  }
+
+  // Move enemies along path
+  enemies.forEach(e => {
+    if (e.dead) { e.fadeTimer -= dt; return; }
+    if (e.slowTimer > 0) { e.slowTimer -= dt; e.slow = 0.45; } else { e.slow = 0; }
+    const spd = e.speed * (1 - e.slow);
+
+    if (e.pathIdx >= PATH_PTS.length-1) {
+      // reached end
+      lives--;
+      e.dead = true; e.fadeTimer = 0;
+      updateHUD();
+      if (lives <= 0) { gameOver(); return; }
+      return;
+    }
+    const target = PATH_PTS[e.pathIdx+1];
+    const dx = target.x-e.x, dy = target.y-e.y;
+    const dist = Math.sqrt(dx*dx+dy*dy);
+    const step = spd*dt;
+    if (step >= dist) {
+      e.x = target.x; e.y = target.y;
+      e.pathIdx++;
+    } else {
+      e.x += dx/dist*step; e.y += dy/dist*step;
+    }
+  });
+
+  // Tower attack
+  towers.forEach(tw => {
+    tw.cooldown -= dt;
+    // Shadow summon (Megumi)
+    if (tw.id === 'megumi') {
+      tw.shadowTimer -= dt;
+      if (tw.shadowTimer <= 0) {
+        tw.shadowTimer = 8;
+        // Spawn a shadow (temp mini-tower)
+        const ang = Math.random()*Math.PI*2;
+        const r = tw.def.range * 0.5;
+        tw.shadows.push({ x: tw.x+Math.cos(ang)*r, y: tw.y+Math.sin(ang)*r, life: 6, cooldown:0, color:'#1d4ed8' });
+      }
+      tw.shadows = tw.shadows.filter(s => {
+        s.life -= dt; s.cooldown -= dt;
+        if (s.cooldown <= 0) {
+          const tgt = findTarget(s.x, s.y, tw.def.range*0.6);
+          if (tgt) { fireProjectile(s.x,s.y,tgt,tw.def.dmg*0.6,'#3b82f6',tw); s.cooldown = 1/tw.def.rate; }
+        }
+        return s.life > 0;
+      });
+    }
+
+    if (tw.cooldown > 0) return;
+    const target = findTarget(tw.x, tw.y, tw.def.range);
+    if (!target) return;
+
+    tw.cooldown = 1/tw.def.rate;
+    tw.hitCount++;
+
+    // SUKUNA: AoE
+    if (tw.def.special === 'aoe') {
+      const inRange = enemies.filter(e => !e.dead && dist2(tw.x,tw.y,e.x,e.y) < tw.def.range);
+      inRange.forEach(e => {
+        let d = tw.def.dmg;
+        dealEnemyDamage(e, d, tw);
+        fireProjectile(tw.x,tw.y,e,d,tw.def.color,tw);
+      });
+      return;
+    }
+
+    let dmg = tw.def.dmg;
+    // NANAMI ratio
+    if (tw.def.special === 'ratio' && tw.hitCount%7 === 0) {
+      dmg *= 3;
+      addFloat(tw.x, tw.y-20, 'RATIO!', '#eab308', 16);
+    }
+
+    // GOJO slow
+    if (tw.def.special === 'slow') {
+      target.slow = 0.45; target.slowTimer = 1.5;
+    }
+
+    dealEnemyDamage(target, dmg, tw);
+    fireProjectile(tw.x,tw.y,target,dmg,tw.def.color,tw);
+  });
+
+  // Move projectiles
+  projectiles = projectiles.filter(p => {
+    p.life -= dt;
+    return p.life > 0;
+  });
+
+  // Particles
+  particles = particles.filter(p => {
+    p.x += p.vx*dt; p.y += p.vy*dt;
+    p.vy += 50*dt; p.life -= dt;
+    return p.life > 0;
+  });
+
+  // Float texts
+  floatTexts = floatTexts.filter(f => { f.y -= 35*dt; f.life -= dt; return f.life > 0; });
+
+  // Remove dead+faded enemies
+  enemies = enemies.filter(e => !(e.dead && e.fadeTimer <= 0));
+
+  // Check wave complete
+  if (waveActive && spawnQueue.length===0 && enemies.filter(e=>!e.dead).length===0) {
+    waveActive = false;
+    const wBtn = document.getElementById('waveBtn');
+    if (wave < 15) {
+      wBtn.disabled = false;
+      wBtn.textContent = `START WAVE ${wave+1}`;
+      showBanner(`WAVE ${wave} CLEARED!`, 2200);
+    } else {
+      victory();
+    }
+    updateHUD();
+  }
+}
+
+function dist2(x1,y1,x2,y2) { return Math.sqrt((x1-x2)**2+(y1-y2)**2); }
+
+function findTarget(tx,ty,range) {
+  // Find enemy furthest along path in range
+  let best = null, bestIdx = -1;
+  enemies.forEach(e => {
+    if (e.dead) return;
+    const d = dist2(tx,ty,e.x,e.y);
+    if (d <= range) {
+      if (e.pathIdx > bestIdx || (e.pathIdx===bestIdx && e.t > (best?.t||0))) {
+        best = e; bestIdx = e.pathIdx;
+      }
+    }
+  });
+  return best;
+}
+
+function fireProjectile(x,y,target,dmg,color,tw) {
+  projectiles.push({ x1:x, y1:y, x2:target.x, y2:target.y, color, dmg, life:0.18 });
+}
+
+function dealEnemyDamage(e, dmg, tw) {
+  e.hp -= dmg;
+  addFloat(e.x, e.y-e.r-8, Math.round(dmg), '#ffff44', 12);
+  if (e.hp <= 0 && !e.dead) {
+    e.dead = true; e.fadeTimer = 0.5;
+    score += e.xp * wave;
+    ce += Math.round(e.xp * 0.8);
+    kills++;
+    spawnKillParticles(e.x,e.y,e.color);
+    updateHUD();
+  }
+}
+
+function spawnKillParticles(x,y,color) {
+  for (let i=0;i<14;i++) {
+    const ang=Math.random()*Math.PI*2, spd=40+Math.random()*90;
+    particles.push({x,y,vx:Math.cos(ang)*spd,vy:Math.sin(ang)*spd-20,r:2+Math.random()*3,color,life:0.5+Math.random()*0.4});
+  }
+}
+
+function addFloat(x,y,text,color,size) {
+  floatTexts.push({x,y,text:String(text),color,size,life:1.0});
+}
+
+function showBanner(msg, dur) {
+  const el = document.getElementById('bannerMsg');
+  const txt = document.getElementById('bannerText');
+  txt.textContent = msg;
+  el.classList.add('visible');
+  setTimeout(()=>el.classList.remove('visible'), dur);
+}
+
+function updateHUD() {
+  document.getElementById('ceVal').textContent = ce;
+  document.getElementById('livesVal').textContent = lives;
+  document.getElementById('waveVal').textContent = `${wave}/15`;
+  document.getElementById('scoreVal').textContent = score;
+  document.getElementById('killsVal').textContent = kills;
+  const hi = localStorage.getItem('domainDefenderBest')||0;
+  document.getElementById('bestVal').textContent = hi;
+}
+
+function gameOver() {
+  gamePhase = 'gameover';
+  saveScore();
+  const hi = localStorage.getItem('domainDefenderBest')||0;
+  const ov = document.getElementById('overlay');
+  ov.innerHTML = `
+    <h1 style="color:#ef4444">DOMAIN BREACHED</h1>
+    <div class="sub">THE CURSED SPIRITS OVERWHELMED YOUR DEFENSE</div>
+    <div class="score-display">SCORE: ${score} &nbsp;|&nbsp; KILLS: ${kills}</div>
+    <div style="color:#ffcc00;font-size:13px">BEST SCORE: ${hi}</div>
+    <button class="btn" onclick="initGame()">PLAY AGAIN</button>
+    <a href="../../index.html" class="btn">BACK TO NEXUS</a>
+  `;
+  ov.style.display = 'flex';
+}
+
+function victory() {
+  gamePhase = 'victory';
+  saveScore();
+  const hi = localStorage.getItem('domainDefenderBest')||0;
+  const ov = document.getElementById('overlay');
+  ov.innerHTML = `
+    <h1 style="color:#a855f7">DOMAIN SECURED</h1>
+    <div class="sub">ALL 15 WAVES REPELLED — THE REALM IS SAFE</div>
+    <div class="score-display">FINAL SCORE: ${score} &nbsp;|&nbsp; KILLS: ${kills}</div>
+    <div style="color:#ffcc00;font-size:13px">BEST SCORE: ${hi}</div>
+    <button class="btn" onclick="initGame()">PLAY AGAIN</button>
+    <a href="../../index.html" class="btn">BACK TO NEXUS</a>
+  `;
+  ov.style.display = 'flex';
+}
+
+function saveScore() {
+  const hi = parseInt(localStorage.getItem('domainDefenderBest')||'0');
+  if (score > hi) localStorage.setItem('domainDefenderBest', score);
+}
+
+// ─── Draw ─────────────────────────────────────────────────────────────────
+function draw() {
+  const W = canvas.width, H = CANVAS_H;
+  ctx.fillStyle = '#080818';
+  ctx.fillRect(0,0,W,H);
+
+  // Grid
+  ctx.strokeStyle = 'rgba(20,30,60,0.6)';
+  ctx.lineWidth = 0.5;
+  for (let c=0;c<=COLS;c++) { ctx.beginPath(); ctx.moveTo(c*GRID_CELL,0); ctx.lineTo(c*GRID_CELL,H); ctx.stroke(); }
+  for (let r=0;r<=ROWS;r++) { ctx.beginPath(); ctx.moveTo(0,r*GRID_CELL); ctx.lineTo(W,r*GRID_CELL); ctx.stroke(); }
+
+  // Path cells (highlight)
+  for (let r=0;r<ROWS;r++) for (let c=0;c<COLS;c++) {
+    if (grid[r][c].hasPath) {
+      ctx.fillStyle = 'rgba(15,20,50,0.85)';
+      ctx.fillRect(c*GRID_CELL,r*GRID_CELL,GRID_CELL,GRID_CELL);
+    }
+  }
+
+  // Path lines
+  if (PATH_PTS.length > 1) {
+    ctx.save();
+    ctx.setLineDash([8,6]);
+    ctx.strokeStyle = 'rgba(180,180,220,0.18)';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(PATH_PTS[0].x, PATH_PTS[0].y);
+    for (let i=1;i<PATH_PTS.length;i++) ctx.lineTo(PATH_PTS[i].x,PATH_PTS[i].y);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    // Start/end markers
+    ctx.fillStyle = '#22c55e'; ctx.shadowBlur=10; ctx.shadowColor='#22c55e';
+    ctx.beginPath(); ctx.arc(PATH_PTS[0].x, PATH_PTS[0].y, 8,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle = '#ef4444'; ctx.shadowColor='#ef4444';
+    ctx.beginPath(); ctx.arc(PATH_PTS[PATH_PTS.length-1].x, PATH_PTS[PATH_PTS.length-1].y, 8,0,Math.PI*2); ctx.fill();
+    ctx.shadowBlur=0;
+    ctx.restore();
+  }
+
+  // Tower range preview on hover
+  if (hoverCell && selectedTower) {
+    const def = TOWER_DEFS.find(d=>d.id===selectedTower);
+    const cell = (hoverCell.row>=0&&hoverCell.row<ROWS&&hoverCell.col>=0&&hoverCell.col<COLS) ? grid[hoverCell.row][hoverCell.col] : null;
+    if (cell && !cell.hasPath && !cell.hasTower) {
+      const cx = hoverCell.col*GRID_CELL+GRID_CELL/2, cy = hoverCell.row*GRID_CELL+GRID_CELL/2;
+      ctx.save();
+      ctx.globalAlpha = 0.12;
+      ctx.fillStyle = def.color;
+      ctx.beginPath(); ctx.arc(cx,cy,def.range,0,Math.PI*2); ctx.fill();
+      ctx.globalAlpha = 0.4;
+      ctx.strokeStyle = def.color; ctx.lineWidth=1;
+      ctx.beginPath(); ctx.arc(cx,cy,def.range,0,Math.PI*2); ctx.stroke();
+      ctx.globalAlpha = 0.3;
+      ctx.fillStyle = def.color;
+      ctx.fillRect(hoverCell.col*GRID_CELL,hoverCell.row*GRID_CELL,GRID_CELL,GRID_CELL);
+      ctx.restore();
+    }
+  }
+
+  // Towers
+  towers.forEach(tw => {
+    const { x,y,def } = tw;
+    ctx.save();
+    ctx.shadowBlur = 14; ctx.shadowColor = def.color;
+    ctx.fillStyle = def.color;
+    // Base
+    ctx.globalAlpha = 0.18;
+    ctx.fillRect(tw.col*GRID_CELL+2, tw.row*GRID_CELL+2, GRID_CELL-4, GRID_CELL-4);
+    ctx.globalAlpha = 1;
+    // Circle
+    ctx.beginPath(); ctx.arc(x,y,12,0,Math.PI*2); ctx.fill();
+    // Icon text
+    ctx.shadowBlur = 0;
+    ctx.font = '16px serif'; ctx.textAlign='center';
+    ctx.fillText(def.icon, x, y+6);
+    // Shadows (Megumi)
+    tw.shadows.forEach(s => {
+      ctx.globalAlpha = Math.min(1, s.life/2);
+      ctx.fillStyle = s.color;
+      ctx.shadowBlur = 8; ctx.shadowColor = s.color;
+      ctx.beginPath(); ctx.arc(s.x,s.y,7,0,Math.PI*2); ctx.fill();
+    });
+    ctx.restore();
+  });
+
+  // Projectile lines
+  projectiles.forEach(p => {
+    ctx.save();
+    ctx.strokeStyle = p.color;
+    ctx.lineWidth = 2.5;
+    ctx.shadowBlur = 10; ctx.shadowColor = p.color;
+    ctx.globalAlpha = p.life * 6;
+    ctx.beginPath(); ctx.moveTo(p.x1,p.y1); ctx.lineTo(p.x2,p.y2); ctx.stroke();
+    ctx.restore();
+  });
+
+  // Enemies
+  enemies.forEach(e => {
+    if (e.dead) {
+      ctx.save(); ctx.globalAlpha = e.fadeTimer;
+    } else ctx.save();
+    ctx.shadowBlur = 10; ctx.shadowColor = e.color;
+    ctx.fillStyle = e.slow>0 ? '#60a5fa' : e.color;
+    ctx.beginPath(); ctx.arc(e.x,e.y,e.r,0,Math.PI*2); ctx.fill();
+    // HP bar
+    const bw=e.r*2.5, bh=4, bx=e.x-bw/2, by=e.y-e.r-8;
+    ctx.fillStyle='#1a0015'; ctx.shadowBlur=0;
+    ctx.fillRect(bx,by,bw,bh);
+    ctx.fillStyle=e.color;
+    ctx.fillRect(bx,by,bw*Math.max(0,e.hp/e.maxHp),bh);
+    ctx.restore();
+  });
+
+  // Particles
+  particles.forEach(p => {
+    ctx.save();
+    ctx.globalAlpha = p.life*2;
+    ctx.fillStyle = p.color;
+    ctx.shadowBlur = 5; ctx.shadowColor = p.color;
+    ctx.beginPath(); ctx.arc(p.x,p.y,p.r,0,Math.PI*2); ctx.fill();
+    ctx.restore();
+  });
+
+  // Float texts
+  floatTexts.forEach(f => {
+    ctx.save();
+    ctx.globalAlpha = Math.min(1,f.life*2);
+    ctx.font = `bold ${f.size}px Courier New`;
+    ctx.fillStyle = f.color;
+    ctx.shadowBlur = 6; ctx.shadowColor = f.color;
+    ctx.textAlign = 'center';
+    ctx.fillText(f.text, f.x, f.y);
+    ctx.restore();
+  });
+}
+
+// Startup
+document.getElementById('startHiBest').textContent = `BEST SCORE: ${localStorage.getItem('domainDefenderBest')||0}`;
+resize();
+// Initial draw of empty grid
+function idleDraw() {
+  if (gamePhase !== 'idle') return;
+  draw();
+  requestAnimationFrame(idleDraw);
+}
+idleDraw();
+</script>
+<script>(function(){
+  var id='domain-defender';
+  var p=parseInt(localStorage.getItem('nexus_plays_'+id)||'0')+1;
+  localStorage.setItem('nexus_plays_'+id,p);
+  var el=document.createElement('div');
+  el.id='nexus-rating-widget';
+  el.style.cssText='position:fixed;bottom:16px;right:16px;z-index:9999;background:rgba(5,5,20,.92);border:1px solid rgba(99,102,241,.3);border-radius:10px;padding:8px 14px;display:flex;align-items:center;gap:8px;font-family:Inter,sans-serif;font-size:.75rem;color:#94a3b8;backdrop-filter:blur(8px);';
+  var votes=JSON.parse(localStorage.getItem('nexus_rating_'+id)||'[]');
+  var myVote=parseInt(localStorage.getItem('nexus_myrating_'+id)||'0');
+  el.innerHTML='<span style="letter-spacing:.06em;font-weight:700;">RATE</span><span id="nrs"></span>';
+  document.body.appendChild(el);
+  function render(){
+    var stars='';
+    for(var i=1;i<=5;i++){
+      var c=i<=(myVote||0)?'#f59e0b':'rgba(255,255,255,.2)';
+      stars+='<span data-v="'+i+'" style="cursor:pointer;font-size:1.1rem;color:'+c+';transition:color .1s;">★</span>';
+    }
+    document.getElementById('nrs').innerHTML=stars;
+    document.querySelectorAll('#nexus-rating-widget [data-v]').forEach(function(s){
+      s.addEventListener('click',function(){
+        var v=parseInt(this.getAttribute('data-v'));
+        if(!myVote){votes.push(v);localStorage.setItem('nexus_rating_'+id,JSON.stringify(votes));}
+        else{var idx=votes.indexOf(myVote);if(idx>-1)votes.splice(idx,1,v);localStorage.setItem('nexus_rating_'+id,JSON.stringify(votes));}
+        myVote=v;localStorage.setItem('nexus_myrating_'+id,v);render();
+      });
+    });
+  }
+  render();
+})();</script>
+</body>
+</html>

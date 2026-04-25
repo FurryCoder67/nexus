@@ -1,0 +1,1525 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SPIRIT CHASE — JJK Horror Survival</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&family=Orbitron:wght@700;900&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+    :root {
+      --bg: #050508;
+      --wall: #1a0a2e;
+      --floor: #0a0514;
+      --player: #e0e8ff;
+      --spirit: #cc1111;
+      --exit: #00ffcc;
+      --energy: #06b6d4;
+      --p: #6366f1;
+      --p2: #8b5cf6;
+      --text: #fff;
+      --muted: #94a3b8;
+      --border: rgba(255,255,255,.08);
+    }
+
+    html, body {
+      width: 100%; height: 100%;
+      overflow: hidden;
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Inter', system-ui, sans-serif;
+      user-select: none;
+    }
+
+    /* Scanline overlay */
+    body::after {
+      content: '';
+      position: fixed; inset: 0;
+      pointer-events: none;
+      background: repeating-linear-gradient(
+        0deg,
+        transparent,
+        transparent 2px,
+        rgba(0,0,0,.08) 2px,
+        rgba(0,0,0,.08) 4px
+      );
+      z-index: 9999;
+    }
+
+    /* NEXUS back button */
+    .nexus-back {
+      position: fixed; top: 14px; left: 16px; z-index: 3000;
+      display: flex; align-items: center; gap: 6px;
+      background: rgba(99,102,241,.15); border: 1px solid rgba(99,102,241,.3);
+      color: #c7d2fe; padding: 6px 14px; border-radius: 8px;
+      text-decoration: none; font-size: .78rem; font-weight: 700;
+      letter-spacing: .06em; transition: all .15s;
+    }
+    .nexus-back:hover { background: rgba(99,102,241,.3); color: #fff; }
+
+    /* ── SCREENS ── */
+    .screen {
+      position: fixed; inset: 0;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      z-index: 100;
+      background: radial-gradient(ellipse at 50% 30%, rgba(26,10,46,.9) 0%, rgba(5,5,8,.98) 70%);
+      transition: opacity .4s;
+    }
+    .screen.hidden { opacity: 0; pointer-events: none; }
+
+    .screen-title {
+      font-family: 'Orbitron', monospace; font-size: clamp(2.5rem, 8vw, 5rem);
+      font-weight: 900; letter-spacing: .08em; margin-bottom: 12px;
+      background: linear-gradient(135deg, #e0e8ff 0%, #8b5cf6 50%, #ff4444 100%);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+      background-clip: text;
+      text-shadow: none;
+      animation: titlePulse 3s ease-in-out infinite;
+    }
+    @keyframes titlePulse {
+      0%, 100% { filter: drop-shadow(0 0 20px rgba(139,92,246,.6)); }
+      50% { filter: drop-shadow(0 0 40px rgba(255,68,68,.5)); }
+    }
+
+    .screen-sub {
+      color: var(--muted); font-size: clamp(.85rem, 2vw, 1.05rem);
+      max-width: 500px; text-align: center; line-height: 1.7;
+      margin-bottom: 36px; padding: 0 20px;
+    }
+
+    .btn-play {
+      font-family: 'Orbitron', monospace; font-size: 1rem; font-weight: 700;
+      letter-spacing: .12em; padding: 16px 48px; border-radius: 10px;
+      border: none; cursor: pointer; transition: all .2s;
+      background: linear-gradient(135deg, #6366f1, #8b5cf6);
+      color: #fff; box-shadow: 0 4px 30px rgba(99,102,241,.5);
+      text-transform: uppercase;
+    }
+    .btn-play:hover { filter: brightness(1.15); transform: translateY(-2px); box-shadow: 0 8px 40px rgba(99,102,241,.7); }
+    .btn-play:active { transform: translateY(0); }
+
+    .screen-stats {
+      margin-bottom: 28px; display: flex; gap: 48px; flex-wrap: wrap; justify-content: center;
+    }
+    .stat-item { text-align: center; }
+    .stat-val { font-family: 'Orbitron'; font-size: 1.8rem; font-weight: 900; color: #c7d2fe; }
+    .stat-lbl { font-size: .72rem; color: var(--muted); letter-spacing: .1em; text-transform: uppercase; margin-top: 4px; }
+
+    .screen-tag {
+      font-family: 'Orbitron'; font-size: clamp(1.4rem, 5vw, 2.8rem); font-weight: 900;
+      letter-spacing: .06em; margin-bottom: 10px;
+      text-shadow: 0 0 30px currentColor;
+    }
+    .tag-win { color: #00ffcc; }
+    .tag-lose { color: #ff4444; }
+
+    .best-row {
+      margin-top: 16px; font-size: .8rem; color: var(--muted); letter-spacing: .06em;
+    }
+    .best-row span { color: #c7d2fe; font-weight: 700; }
+
+    /* NEXUS header strip inside game */
+    #nexus-header {
+      position: fixed; top: 0; left: 0; right: 0; height: 48px; z-index: 200;
+      background: rgba(5,5,8,.9); border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0 16px;
+      backdrop-filter: blur(12px);
+    }
+    #nexus-header .logo {
+      font-family: 'Orbitron'; font-weight: 900; font-size: .95rem;
+      background: linear-gradient(135deg, #6366f1, #8b5cf6, #06b6d4);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+      letter-spacing: .08em;
+    }
+    #nexus-header .game-name {
+      font-family: 'Orbitron'; font-size: .8rem; font-weight: 700;
+      color: #8b5cf6; letter-spacing: .1em;
+    }
+
+    /* ── GAME HUD ── */
+    #hud-top {
+      position: fixed; top: 48px; left: 0; right: 0; height: 48px; z-index: 200;
+      background: rgba(5,5,8,.85); border-bottom: 1px solid rgba(139,92,246,.2);
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0 20px; gap: 16px;
+      backdrop-filter: blur(8px);
+    }
+    .hud-section { display: flex; align-items: center; gap: 12px; }
+
+    /* Hearts */
+    .lives { display: flex; gap: 6px; }
+    .heart { font-size: 1.1rem; transition: transform .2s; }
+    .heart.lost { opacity: .2; filter: grayscale(1); transform: scale(.85); }
+
+    .hud-label {
+      font-size: .7rem; color: var(--muted); letter-spacing: .1em; text-transform: uppercase; font-weight: 600;
+    }
+    .hud-value {
+      font-family: 'Orbitron'; font-size: .95rem; font-weight: 700; color: #c7d2fe;
+    }
+
+    /* ── BOTTOM HUD ── */
+    #hud-bottom {
+      position: fixed; bottom: 0; left: 0; right: 0; height: 56px; z-index: 200;
+      background: rgba(5,5,8,.85); border-top: 1px solid rgba(6,182,212,.15);
+      display: flex; align-items: center; gap: 20px; padding: 0 20px;
+      backdrop-filter: blur(8px);
+    }
+    .energy-wrap { display: flex; flex-direction: column; gap: 4px; flex: 1; max-width: 280px; }
+    .energy-label { font-size: .65rem; color: var(--muted); letter-spacing: .1em; text-transform: uppercase; display: flex; justify-content: space-between; }
+    .energy-bar-bg {
+      height: 8px; background: rgba(6,182,212,.12); border-radius: 4px;
+      border: 1px solid rgba(6,182,212,.2); overflow: hidden;
+    }
+    .energy-bar-fill {
+      height: 100%; background: linear-gradient(90deg, #0891b2, #06b6d4, #22d3ee);
+      border-radius: 4px; transition: width .1s;
+      box-shadow: 0 0 8px rgba(6,182,212,.5);
+    }
+
+    .pulse-btn {
+      display: flex; flex-direction: column; align-items: center; gap: 2px;
+      background: rgba(139,92,246,.15); border: 1px solid rgba(139,92,246,.4);
+      border-radius: 8px; padding: 6px 14px; cursor: pointer; transition: all .15s;
+      min-width: 80px;
+    }
+    .pulse-btn.ready { border-color: rgba(139,92,246,.8); box-shadow: 0 0 12px rgba(139,92,246,.3); }
+    .pulse-btn.on-cooldown { opacity: .5; cursor: not-allowed; }
+    .pulse-key { font-family: 'Orbitron'; font-size: .75rem; font-weight: 700; color: #c7d2fe; }
+    .pulse-label { font-size: .6rem; color: var(--muted); letter-spacing: .08em; }
+
+    .run-indicator {
+      display: flex; flex-direction: column; align-items: center; gap: 2px;
+      background: rgba(245,158,11,.1); border: 1px solid rgba(245,158,11,.3);
+      border-radius: 8px; padding: 6px 14px; min-width: 70px;
+    }
+    .run-indicator.active { border-color: rgba(245,158,11,.8); box-shadow: 0 0 12px rgba(245,158,11,.3); }
+    .run-key { font-family: 'Orbitron'; font-size: .75rem; font-weight: 700; color: #fbbf24; }
+    .run-label { font-size: .6rem; color: var(--muted); letter-spacing: .08em; }
+
+    .hud-hint {
+      font-size: .65rem; color: var(--muted); letter-spacing: .05em; flex: 1; text-align: right;
+    }
+
+    /* ── MINIMAP ── */
+    #minimap-canvas {
+      position: fixed; bottom: 64px; right: 12px; z-index: 200;
+      border: 1px solid rgba(99,102,241,.3); border-radius: 6px;
+      box-shadow: 0 0 20px rgba(0,0,0,.8);
+    }
+
+    /* ── MAIN CANVAS ── */
+    #game-canvas {
+      position: fixed;
+      left: 50%; top: 50%;
+      transform: translate(-50%, -50%);
+      image-rendering: pixelated;
+      cursor: crosshair;
+    }
+
+    /* ── OVERLAYS ── */
+    #flash-overlay {
+      position: fixed; inset: 0; z-index: 500;
+      pointer-events: none; opacity: 0;
+      background: #ff0000;
+      transition: opacity .05s;
+    }
+
+    #pulse-wave {
+      position: fixed; border-radius: 50%;
+      border: 3px solid rgba(99,102,241,.9);
+      pointer-events: none;
+      transform: translate(-50%, -50%);
+      opacity: 0;
+      z-index: 150;
+      box-shadow: 0 0 20px rgba(99,102,241,.5);
+    }
+
+    /* Fog / blue tint when pulse active */
+    #pulse-tint {
+      position: fixed; inset: 0; z-index: 149;
+      pointer-events: none; opacity: 0;
+      background: rgba(6, 182, 212, 0.06);
+      transition: opacity .3s;
+    }
+  </style>
+</head>
+<body>
+
+<!-- NEXUS header (always visible) -->
+<div id="nexus-header">
+  <a class="nexus-back" href="../../index.html" style="position:static;">← NEXUS</a>
+  <span class="game-name">SPIRIT CHASE</span>
+  <span style="font-size:.72rem;color:var(--muted);letter-spacing:.08em;">JJK HORROR SURVIVAL</span>
+</div>
+
+<!-- Game canvas -->
+<canvas id="game-canvas"></canvas>
+
+<!-- Minimap -->
+<canvas id="minimap-canvas" width="80" height="80"></canvas>
+
+<!-- HUD Top -->
+<div id="hud-top">
+  <div class="hud-section">
+    <div class="lives" id="lives-hud"></div>
+  </div>
+  <div class="hud-section">
+    <div class="hud-label">ROUND</div>
+    <div class="hud-value" id="round-val">1</div>
+  </div>
+  <div class="hud-section">
+    <div class="hud-label">TIME</div>
+    <div class="hud-value" id="timer-val">0:00</div>
+  </div>
+  <div class="hud-section">
+    <div class="hud-label">SPIRITS</div>
+    <div class="hud-value" id="spirits-val">0</div>
+  </div>
+</div>
+
+<!-- HUD Bottom -->
+<div id="hud-bottom">
+  <div class="energy-wrap">
+    <div class="energy-label">
+      <span>CURSED ENERGY</span>
+      <span id="energy-val">100</span>
+    </div>
+    <div class="energy-bar-bg">
+      <div class="energy-bar-fill" id="energy-bar" style="width:100%"></div>
+    </div>
+  </div>
+  <div class="pulse-btn ready" id="pulse-btn" title="Space / Click to pulse">
+    <span class="pulse-key">SPACE</span>
+    <span class="pulse-label">PULSE (25)</span>
+  </div>
+  <div class="run-indicator" id="run-ind">
+    <span class="run-key">SHIFT</span>
+    <span class="run-label">RUN (2/s)</span>
+  </div>
+  <div class="hud-hint">WASD / Arrows — move &nbsp;|&nbsp; Shift — run &nbsp;|&nbsp; Space — pulse</div>
+</div>
+
+<!-- Flash overlay -->
+<div id="flash-overlay"></div>
+
+<!-- Pulse wave -->
+<div id="pulse-wave"></div>
+
+<!-- Pulse tint -->
+<div id="pulse-tint"></div>
+
+<!-- ── SCREENS ── -->
+
+<!-- Start screen -->
+<div class="screen" id="screen-start">
+  <div class="screen-title">SPIRIT CHASE</div>
+  <div class="screen-sub">
+    You are trapped inside a <strong style="color:#8b5cf6">Domain Expansion</strong>.<br>
+    Cursed spirits hunt you through endless corridors.<br>
+    Find the exit. Survive. Escape before the curses find you.
+  </div>
+  <div id="start-best" class="best-row" style="margin-bottom:28px"></div>
+  <button class="btn-play" id="btn-start">ENTER THE DOMAIN</button>
+  <div style="margin-top:20px;font-size:.72rem;color:var(--muted);text-align:center;line-height:1.8">
+    WASD / Arrows — Move &nbsp;•&nbsp; Space — Cursed Pulse &nbsp;•&nbsp; Shift — Run<br>
+    Pulse stuns spirits & reveals maze for 3s. Run drains energy. Energy regens when walking.
+  </div>
+</div>
+
+<!-- Round complete screen -->
+<div class="screen hidden" id="screen-round">
+  <div class="screen-tag tag-win">DOMAIN BREACHED</div>
+  <div class="screen-sub" id="round-sub"></div>
+  <div class="screen-stats" id="round-stats"></div>
+  <button class="btn-play" id="btn-next" style="background:linear-gradient(135deg,#059669,#10b981);box-shadow:0 4px 30px rgba(16,185,129,.4)">
+    NEXT DOMAIN →
+  </button>
+</div>
+
+<!-- Game over screen -->
+<div class="screen hidden" id="screen-over">
+  <div class="screen-tag tag-lose">CONSUMED BY CURSES</div>
+  <div class="screen-sub">The spirits have claimed you. Your cursed energy fades into the domain.</div>
+  <div class="screen-stats" id="over-stats"></div>
+  <div id="over-best" class="best-row" style="margin-bottom:28px"></div>
+  <button class="btn-play" id="btn-retry" style="background:linear-gradient(135deg,#991b1b,#dc2626);box-shadow:0 4px 30px rgba(220,38,38,.4)">
+    TRY AGAIN
+  </button>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════
+// SPIRIT CHASE — GAME ENGINE
+// ═══════════════════════════════════════════════════════
+
+const CELL = 32;
+const MIN_MAZE = 15;
+const MAX_MAZE = 25;
+const VISION_RADIUS = 8;  // cells
+const PLAYER_RADIUS = 9;
+const SPIRIT_RADIUS = 11;
+const EXIT_RADIUS = 13;
+const BASE_SPEED = 120;   // px/sec
+const RUN_SPEED  = 210;
+const ENERGY_MAX = 100;
+const ENERGY_REGEN = 5;    // per sec when walking
+const RUN_DRAIN  = 2;      // per sec
+const PULSE_COST = 25;
+const PULSE_STUN_TIME = 2.0;
+const PULSE_REVEAL_TIME = 3.0;
+const PULSE_RADIUS_CELLS = 6;
+const BFS_INTERVAL = 0.5;   // recalc every 0.5s
+const SPIRIT_BASE_SPEED = 65;
+
+// Audio context
+let audioCtx = null;
+function getAudioCtx() {
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  return audioCtx;
+}
+
+function playTone(freq, type, duration, volume = 0.3, delay = 0) {
+  try {
+    const ctx = getAudioCtx();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain); gain.connect(ctx.destination);
+    osc.type = type; osc.frequency.value = freq;
+    gain.gain.setValueAtTime(0, ctx.currentTime + delay);
+    gain.gain.linearRampToValueAtTime(volume, ctx.currentTime + delay + 0.01);
+    gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + delay + duration);
+    osc.start(ctx.currentTime + delay);
+    osc.stop(ctx.currentTime + delay + duration + 0.05);
+  } catch(e) {}
+}
+
+function playFootstep() {
+  try {
+    const ctx = getAudioCtx();
+    const buf = ctx.createBuffer(1, ctx.sampleRate * 0.05, ctx.sampleRate);
+    const data = buf.getChannelData(0);
+    for (let i = 0; i < data.length; i++) data[i] = (Math.random() * 2 - 1) * (1 - i / data.length) * 0.18;
+    const src = ctx.createBufferSource();
+    const gain = ctx.createGain();
+    src.buffer = buf; src.connect(gain); gain.connect(ctx.destination);
+    gain.gain.value = 0.12;
+    src.start();
+  } catch(e) {}
+}
+
+function playScare() {
+  // Jump scare: loud high tone + low rumble
+  playTone(880, 'sawtooth', 0.4, 0.7);
+  playTone(440, 'square', 0.6, 0.4, 0.05);
+  playTone(110, 'triangle', 0.8, 0.5, 0.1);
+}
+
+function playPulse() {
+  playTone(220, 'sine', 0.3, 0.4);
+  playTone(440, 'sine', 0.2, 0.3, 0.1);
+  playTone(880, 'sine', 0.15, 0.2, 0.2);
+}
+
+function playExitReach() {
+  playTone(523, 'sine', 0.2, 0.5);
+  playTone(659, 'sine', 0.2, 0.5, 0.12);
+  playTone(784, 'sine', 0.3, 0.5, 0.24);
+  playTone(1047,'sine', 0.4, 0.5, 0.36);
+}
+
+// ── MAZE GENERATION (recursive backtracking) ──────────────────
+function generateMaze(rows, cols) {
+  // visited[r][c], walls: N S E W per cell
+  // We'll store as a 2D array of bitmask: bit0=N, bit1=S, bit2=E, bit3=W
+  const OPEN = new Uint8Array(rows * cols); // bitmask of open directions
+  const visited = new Uint8Array(rows * cols);
+  const N = 1, S = 2, E = 4, W = 8;
+  const opp = { [N]: S, [S]: N, [E]: W, [W]: E };
+  const dr  = { [N]: -1, [S]: 1, [E]: 0, [W]: 0 };
+  const dc  = { [N]: 0,  [S]: 0, [E]: 1, [W]: -1 };
+
+  function idx(r, c) { return r * cols + c; }
+
+  // Iterative DFS (avoids stack overflow on large mazes)
+  const stack = [[0, 0]];
+  visited[idx(0, 0)] = 1;
+  while (stack.length > 0) {
+    const [r, c] = stack[stack.length - 1];
+    const dirs = [N, S, E, W].sort(() => Math.random() - .5);
+    let moved = false;
+    for (const d of dirs) {
+      const nr = r + dr[d], nc = c + dc[d];
+      if (nr < 0 || nr >= rows || nc < 0 || nc >= cols) continue;
+      if (visited[idx(nr, nc)]) continue;
+      OPEN[idx(r, c)]  |= d;
+      OPEN[idx(nr, nc)] |= opp[d];
+      visited[idx(nr, nc)] = 1;
+      stack.push([nr, nc]);
+      moved = true;
+      break;
+    }
+    if (!moved) stack.pop();
+  }
+  return { OPEN, rows, cols, N, S, E, W };
+}
+
+// Convert maze to wall segments for rendering
+// Returns a 2D boolean grid of solid cells (walls between maze cells)
+// Maze cells occupy odd positions; walls occupy even positions
+function mazeToGrid(maze) {
+  const { OPEN, rows, cols, N, S, E, W } = maze;
+  const gRows = rows * 2 + 1;
+  const gCols = cols * 2 + 1;
+  // true = wall
+  const grid = new Uint8Array(gRows * gCols);
+  // fill all with walls
+  grid.fill(1);
+
+  function gIdx(gr, gc) { return gr * gCols + gc; }
+
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      const gr = r * 2 + 1, gc = c * 2 + 1;
+      // cell itself is open floor
+      grid[gIdx(gr, gc)] = 0;
+      const open = OPEN[r * cols + c];
+      if (open & N) grid[gIdx(gr - 1, gc)] = 0;
+      if (open & S) grid[gIdx(gr + 1, gc)] = 0;
+      if (open & E) grid[gIdx(gr, gc + 1)] = 0;
+      if (open & W) grid[gIdx(gr, gc - 1)] = 0;
+    }
+  }
+  return { grid, gRows, gCols };
+}
+
+// ── BFS PATHFINDING ───────────────────────────────────────────
+function bfsPath(grid, gRows, gCols, startGR, startGC, goalGR, goalGC) {
+  if (startGR === goalGR && startGC === goalGC) return [];
+  const idx = (r, c) => r * gCols + c;
+  const visited = new Uint8Array(gRows * gCols);
+  const parent  = new Int32Array(gRows * gCols).fill(-1);
+  const queue = [idx(startGR, startGC)];
+  visited[idx(startGR, startGC)] = 1;
+  const goalIdx = idx(goalGR, goalGC);
+
+  while (queue.length > 0) {
+    const cur = queue.shift();
+    if (cur === goalIdx) break;
+    const r = Math.floor(cur / gCols), c = cur % gCols;
+    for (const [dr, dc] of [[-1,0],[1,0],[0,-1],[0,1]]) {
+      const nr = r + dr, nc = c + dc;
+      if (nr < 0 || nr >= gRows || nc < 0 || nc >= gCols) continue;
+      const ni = idx(nr, nc);
+      if (visited[ni] || grid[ni]) continue;
+      visited[ni] = 1;
+      parent[ni] = cur;
+      queue.push(ni);
+    }
+  }
+
+  if (parent[goalIdx] === -1 && idx(startGR, startGC) !== goalIdx) return null;
+  const path = [];
+  let cur = goalIdx;
+  while (cur !== idx(startGR, startGC)) {
+    path.unshift({ r: Math.floor(cur / gCols), c: cur % gCols });
+    if (parent[cur] === -1) return null;
+    cur = parent[cur];
+  }
+  return path;
+}
+
+// World coord → nearest open grid cell
+function worldToGrid(wx, wy) {
+  return {
+    gr: Math.round(wy / (CELL / 2)),
+    gc: Math.round(wx / (CELL / 2))
+  };
+}
+
+function gridToWorld(gr, gc) {
+  return { wx: gc * (CELL / 2), wy: gr * (CELL / 2) };
+}
+
+// ── PARTICLES ────────────────────────────────────────────────
+class Particle {
+  constructor(x, y, vx, vy, color, life, radius) {
+    this.x = x; this.y = y; this.vx = vx; this.vy = vy;
+    this.color = color; this.life = life; this.maxLife = life;
+    this.radius = radius;
+  }
+  update(dt) {
+    this.x += this.vx * dt;
+    this.y += this.vy * dt;
+    this.vy += 120 * dt; // gravity
+    this.life -= dt;
+  }
+  draw(ctx, camX, camY) {
+    const alpha = Math.max(0, this.life / this.maxLife);
+    ctx.globalAlpha = alpha;
+    ctx.fillStyle = this.color;
+    ctx.beginPath();
+    ctx.arc(this.x - camX, this.y - camY, this.radius * alpha + 1, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.globalAlpha = 1;
+  }
+}
+
+// ── MAIN GAME STATE ──────────────────────────────────────────
+const canvas = document.getElementById('game-canvas');
+const ctx    = canvas.getContext('2d');
+const miniCanvas = document.getElementById('minimap-canvas');
+const miniCtx    = miniCanvas.getContext('2d');
+
+let gameState = 'start'; // 'start' | 'playing' | 'round-over' | 'game-over'
+let maze, mazeGrid;
+let mazeRows, mazeCols;
+let player, spirits, exitPos;
+let lives, round, sessionTime, pulseActive, pulseTimer, pulseCooldown;
+let energy, isRunning;
+let particles = [];
+let footstepTimer = 0;
+let bfsTimer = 0;
+let keys = {};
+let animId;
+let lastTime = 0;
+let invincibleTimer = 0; // brief invincibility after hit
+let exitAnimAngle = 0;
+
+// DOM refs
+const hudLives   = document.getElementById('lives-hud');
+const hudRound   = document.getElementById('round-val');
+const hudTimer   = document.getElementById('timer-val');
+const hudSpirits = document.getElementById('spirits-val');
+const hudEnergy  = document.getElementById('energy-val');
+const energyBar  = document.getElementById('energy-bar');
+const pulseBtn   = document.getElementById('pulse-btn');
+const runInd     = document.getElementById('run-ind');
+const flashOverlay = document.getElementById('flash-overlay');
+const pulseWave    = document.getElementById('pulse-wave');
+const pulseTint    = document.getElementById('pulse-tint');
+
+const screens = {
+  start:  document.getElementById('screen-start'),
+  round:  document.getElementById('screen-round'),
+  over:   document.getElementById('screen-over'),
+};
+
+// ── RESIZE ───────────────────────────────────────────────────
+function resizeCanvas() {
+  const w = window.innerWidth;
+  const h = window.innerHeight - 48 - 48 - 56; // header + hud-top + hud-bottom
+  canvas.style.width  = w + 'px';
+  canvas.style.height = (h) + 'px';
+  canvas.width  = w;
+  canvas.height = h;
+  canvas.style.top = (48 + 48) + 'px';
+  canvas.style.transform = 'none';
+  canvas.style.left = '0';
+}
+window.addEventListener('resize', resizeCanvas);
+resizeCanvas();
+
+// ── INIT ROUND ───────────────────────────────────────────────
+function initRound(roundNum) {
+  mazeRows = Math.min(MIN_MAZE + (roundNum - 1) * 2, MAX_MAZE);
+  mazeCols = Math.min(MIN_MAZE + (roundNum - 1) * 2, MAX_MAZE);
+
+  maze = generateMaze(mazeRows, mazeCols);
+  const g = mazeToGrid(maze);
+  mazeGrid = g;
+
+  // Player starts at top-left cell (gr=1, gc=1 in grid coords)
+  player = {
+    x: 1 * (CELL / 2) + CELL / 2,
+    y: 1 * (CELL / 2) + CELL / 2,
+    vx: 0, vy: 0,
+    trailX: [], trailY: [],
+  };
+
+  // EXIT: bottom-right maze cell
+  const exGR = (mazeRows - 1) * 2 + 1;
+  const exGC = (mazeCols - 1) * 2 + 1;
+  const exW = gridToWorld(exGR, exGC);
+  exitPos = { x: exW.wx, y: exW.wy, gr: exGR, gc: exGC };
+
+  // Spawn spirits
+  const numSpirits = Math.min(3 + roundNum - 1, 6);
+  spirits = [];
+  const speedMult = 1 + (roundNum - 1) * 0.12;
+  for (let i = 0; i < numSpirits; i++) {
+    // Spread spawn points across the maze
+    const mr = 2 + Math.floor(i / 2) * Math.floor(mazeRows / 3);
+    const mc = (mazeRows - 2) - (i % 2) * Math.floor(mazeCols / 3);
+    const spawnR = Math.min(mazeRows - 1, Math.max(1, mr));
+    const spawnC = Math.min(mazeCols - 1, Math.max(1, mc));
+    const spGR = spawnR * 2 + 1;
+    const spGC = spawnC * 2 + 1;
+    const spW = gridToWorld(spGR, spGC);
+    spirits.push({
+      x: spW.wx, y: spW.wy,
+      gr: spGR, gc: spGC,
+      speed: SPIRIT_BASE_SPEED * speedMult,
+      state: 'patrol',  // 'patrol' | 'chase' | 'stunned'
+      stunTimer: 0,
+      path: [],
+      pathTimer: 0,
+      patrolTarget: null,
+      trailX: Array(6).fill(spW.wx),
+      trailY: Array(6).fill(spW.wy),
+      trailTimer: 0,
+      alertTimer: 0,
+      spinAngle: 0,
+    });
+  }
+
+  energy = ENERGY_MAX;
+  pulseActive = false;
+  pulseTimer = 0;
+  pulseCooldown = 0;
+  particles = [];
+  footstepTimer = 0;
+  bfsTimer = 0;
+  invincibleTimer = 0;
+  exitAnimAngle = 0;
+}
+
+function initGame() {
+  lives = 3;
+  round = 1;
+  sessionTime = 0;
+  initRound(round);
+}
+
+// ── MOVEMENT HELPERS ─────────────────────────────────────────
+function isWallAt(wx, wy) {
+  const { grid, gRows, gCols } = mazeGrid;
+  const gr = Math.round(wy / (CELL / 2));
+  const gc = Math.round(wx / (CELL / 2));
+  if (gr < 0 || gr >= gRows || gc < 0 || gc >= gCols) return true;
+  return grid[gr * gCols + gc] === 1;
+}
+
+function resolveCollision(ox, oy, nx, ny, radius) {
+  // Try X then Y separately
+  const half = CELL / 2;
+  // Check bounding box corners + sides
+  function blocked(tx, ty) {
+    // Check 8 points around the circle
+    for (let angle = 0; angle < Math.PI * 2; angle += Math.PI / 4) {
+      const px = tx + Math.cos(angle) * (radius - 2);
+      const py = ty + Math.sin(angle) * (radius - 2);
+      if (isWallAt(px, py)) return true;
+    }
+    return false;
+  }
+  let rx = nx, ry = ny;
+  if (blocked(nx, oy)) rx = ox;
+  if (blocked(ox, ny)) ry = oy;
+  if (blocked(rx, ry)) { rx = ox; ry = oy; }
+  return { x: rx, y: ry };
+}
+
+// Check if two world positions have line of sight (no wall between)
+function hasLOS(x1, y1, x2, y2) {
+  const dx = x2 - x1, dy = y2 - y1;
+  const dist = Math.sqrt(dx * dx + dy * dy);
+  const steps = Math.ceil(dist / (CELL / 4));
+  for (let i = 1; i < steps; i++) {
+    const t = i / steps;
+    if (isWallAt(x1 + dx * t, y1 + dy * t)) return false;
+  }
+  return true;
+}
+
+// ── SPIRIT AI ────────────────────────────────────────────────
+function updateSpiritPath(spirit) {
+  const { grid, gRows, gCols } = mazeGrid;
+  // Current grid position
+  const sGR = Math.round(spirit.y / (CELL / 2));
+  const sGC = Math.round(spirit.x / (CELL / 2));
+  const pGR = Math.round(player.y / (CELL / 2));
+  const pGC = Math.round(player.x / (CELL / 2));
+
+  if (spirit.state === 'chase') {
+    const path = bfsPath(grid, gRows, gCols, sGR, sGC, pGR, pGC);
+    spirit.path = path || [];
+  } else if (spirit.state === 'patrol') {
+    // Pick a random reachable target
+    if (!spirit.patrolTarget || (spirit.path && spirit.path.length === 0)) {
+      let tries = 0;
+      while (tries < 20) {
+        tries++;
+        const tr = Math.floor(Math.random() * mazeRows) * 2 + 1;
+        const tc = Math.floor(Math.random() * mazeCols) * 2 + 1;
+        if (grid[tr * gCols + tc] === 0) {
+          spirit.patrolTarget = { gr: tr, gc: tc };
+          break;
+        }
+      }
+    }
+    if (spirit.patrolTarget) {
+      const path = bfsPath(grid, gRows, gCols, sGR, sGC, spirit.patrolTarget.gr, spirit.patrolTarget.gc);
+      if (path && path.length > 0) {
+        spirit.path = path;
+      } else {
+        spirit.patrolTarget = null;
+        spirit.path = [];
+      }
+    }
+  }
+}
+
+function moveSpirit(spirit, dt) {
+  if (spirit.state === 'stunned') {
+    spirit.stunTimer -= dt;
+    spirit.spinAngle += 6 * dt;
+    if (spirit.stunTimer <= 0) {
+      spirit.state = 'patrol';
+      spirit.stunTimer = 0;
+    }
+    return;
+  }
+
+  const path = spirit.path;
+  if (!path || path.length === 0) return;
+
+  const target = path[0];
+  const tx = target.c * (CELL / 2);
+  const ty = target.r * (CELL / 2);
+  const dx = tx - spirit.x;
+  const dy = ty - spirit.y;
+  const dist = Math.sqrt(dx * dx + dy * dy);
+
+  const spd = spirit.speed * (spirit.state === 'chase' ? 1.2 : 0.8);
+
+  if (dist < 4) {
+    spirit.x = tx; spirit.y = ty;
+    spirit.path.shift();
+  } else {
+    spirit.x += (dx / dist) * spd * dt;
+    spirit.y += (dy / dist) * spd * dt;
+  }
+
+  // Trail
+  spirit.trailTimer += dt;
+  if (spirit.trailTimer > 0.05) {
+    spirit.trailTimer = 0;
+    spirit.trailX.push(spirit.x);
+    spirit.trailY.push(spirit.y);
+    if (spirit.trailX.length > 8) { spirit.trailX.shift(); spirit.trailY.shift(); }
+  }
+}
+
+// ── PULSE ────────────────────────────────────────────────────
+function triggerPulse() {
+  if (pulseCooldown > 0 || energy < PULSE_COST) return;
+  energy = Math.max(0, energy - PULSE_COST);
+  pulseActive = true;
+  pulseTimer = PULSE_REVEAL_TIME;
+  pulseCooldown = 1.5;
+
+  playPulse();
+
+  // Stun nearby spirits
+  spirits.forEach(s => {
+    const dx = s.x - player.x, dy = s.y - player.y;
+    const dist = Math.sqrt(dx*dx + dy*dy);
+    if (dist < PULSE_RADIUS_CELLS * CELL) {
+      s.state = 'stunned';
+      s.stunTimer = PULSE_STUN_TIME;
+      s.path = [];
+    }
+  });
+
+  // Animate pulse wave on DOM
+  animatePulseWave();
+  pulseTint.style.opacity = '1';
+  setTimeout(() => { pulseTint.style.opacity = '0'; }, PULSE_REVEAL_TIME * 1000);
+}
+
+function animatePulseWave() {
+  const rect = canvas.getBoundingClientRect();
+  const camX = player.x - canvas.width / 2;
+  const camY = player.y - canvas.height / 2;
+  const screenX = rect.left + (player.x - camX);
+  const screenY = rect.top  + (player.y - camY);
+
+  pulseWave.style.left = screenX + 'px';
+  pulseWave.style.top  = screenY + 'px';
+  pulseWave.style.width  = '20px';
+  pulseWave.style.height = '20px';
+  pulseWave.style.opacity = '1';
+
+  let size = 20;
+  const maxSize = PULSE_RADIUS_CELLS * CELL * 2;
+  const startTime = performance.now();
+
+  function step(now) {
+    const t = (now - startTime) / 600;
+    if (t >= 1) { pulseWave.style.opacity = '0'; return; }
+    size = 20 + t * maxSize;
+    pulseWave.style.width  = size + 'px';
+    pulseWave.style.height = size + 'px';
+    pulseWave.style.opacity = (1 - t) + '';
+    requestAnimationFrame(step);
+  }
+  requestAnimationFrame(step);
+}
+
+// ── PLAYER HIT ───────────────────────────────────────────────
+function playerHit() {
+  if (invincibleTimer > 0) return;
+  lives--;
+  invincibleTimer = 2.5;
+
+  playScare();
+  flashRed();
+  spawnCurseParticles(player.x, player.y);
+
+  // Reset player to start
+  player.x = 1 * (CELL / 2) + CELL / 2;
+  player.y = 1 * (CELL / 2) + CELL / 2;
+
+  // Reset hitting spirit
+  spirits.forEach(s => {
+    const dx = s.x - player.x + 1 * (CELL / 2) + CELL / 2;
+    const dy = s.y - player.y + 1 * (CELL / 2) + CELL / 2;
+    if (Math.sqrt(dx*dx + dy*dy) < (PLAYER_RADIUS + SPIRIT_RADIUS) * 2) {
+      // reset to spawn
+    }
+  });
+
+  updateHUD();
+
+  if (lives <= 0) {
+    endGame();
+  }
+}
+
+function flashRed() {
+  flashOverlay.style.opacity = '0.7';
+  setTimeout(() => { flashOverlay.style.opacity = '0'; }, 200);
+}
+
+function spawnCurseParticles(x, y) {
+  for (let i = 0; i < 20; i++) {
+    const angle = Math.random() * Math.PI * 2;
+    const speed = 80 + Math.random() * 180;
+    const colors = ['#cc0000','#ff4444','#8b1111','#660000','#ff2200','#440000'];
+    particles.push(new Particle(
+      x, y,
+      Math.cos(angle) * speed,
+      Math.sin(angle) * speed - 60,
+      colors[Math.floor(Math.random() * colors.length)],
+      0.6 + Math.random() * 0.8,
+      2 + Math.random() * 3
+    ));
+  }
+}
+
+// ── WIN ROUND ────────────────────────────────────────────────
+function winRound() {
+  gameState = 'round-over';
+  playExitReach();
+  spawnWinParticles();
+  showRoundScreen();
+}
+
+function spawnWinParticles() {
+  for (let i = 0; i < 30; i++) {
+    const angle = Math.random() * Math.PI * 2;
+    const speed = 60 + Math.random() * 200;
+    const colors = ['#00ffcc','#06b6d4','#22d3ee','#0891b2'];
+    particles.push(new Particle(
+      player.x, player.y,
+      Math.cos(angle) * speed,
+      Math.sin(angle) * speed - 80,
+      colors[Math.floor(Math.random() * colors.length)],
+      0.8 + Math.random() * 1.2,
+      2 + Math.random() * 4
+    ));
+  }
+}
+
+function endGame() {
+  gameState = 'game-over';
+  updateBest();
+  showOverScreen();
+}
+
+// ── HUD UPDATE ───────────────────────────────────────────────
+function updateHUD() {
+  // Lives
+  hudLives.innerHTML = '';
+  for (let i = 0; i < 3; i++) {
+    const h = document.createElement('span');
+    h.className = 'heart' + (i >= lives ? ' lost' : '');
+    h.textContent = '♥';
+    hudLives.appendChild(h);
+  }
+  hudRound.textContent = round;
+  hudSpirits.textContent = spirits.filter(s => s.state !== 'stunned').length;
+
+  // Energy
+  const pct = (energy / ENERGY_MAX * 100).toFixed(0);
+  hudEnergy.textContent = Math.round(energy);
+  energyBar.style.width = pct + '%';
+
+  // Pulse button state
+  if (pulseCooldown > 0 || energy < PULSE_COST) {
+    pulseBtn.className = 'pulse-btn on-cooldown';
+  } else {
+    pulseBtn.className = 'pulse-btn ready';
+  }
+
+  // Run indicator
+  if (isRunning) {
+    runInd.className = 'run-indicator active';
+  } else {
+    runInd.className = 'run-indicator';
+  }
+
+  // Timer
+  const m = Math.floor(sessionTime / 60);
+  const s = Math.floor(sessionTime % 60);
+  hudTimer.textContent = m + ':' + String(s).padStart(2, '0');
+}
+
+// ── SCREENS ──────────────────────────────────────────────────
+function showScreen(name) {
+  Object.entries(screens).forEach(([k, el]) => {
+    el.classList.toggle('hidden', k !== name);
+  });
+}
+
+function showRoundScreen() {
+  const m = Math.floor(sessionTime / 60);
+  const s = Math.floor(sessionTime % 60);
+  document.getElementById('round-sub').textContent =
+    `Round ${round} complete! Time: ${m}:${String(s).padStart(2,'0')} — Cursed energy carries over.`;
+  document.getElementById('round-stats').innerHTML = `
+    <div class="stat-item"><div class="stat-val">${round}</div><div class="stat-lbl">Round</div></div>
+    <div class="stat-item"><div class="stat-val">${m}:${String(s).padStart(2,'0')}</div><div class="stat-lbl">Time</div></div>
+    <div class="stat-item"><div class="stat-val">${Math.round(energy)}</div><div class="stat-lbl">Energy Left</div></div>
+    <div class="stat-item"><div class="stat-val">${lives}</div><div class="stat-lbl">Lives</div></div>
+  `;
+  showScreen('round');
+}
+
+function showOverScreen() {
+  const m = Math.floor(sessionTime / 60);
+  const s = Math.floor(sessionTime % 60);
+  const best = getBest();
+  document.getElementById('over-stats').innerHTML = `
+    <div class="stat-item"><div class="stat-val">${round}</div><div class="stat-lbl">Round Reached</div></div>
+    <div class="stat-item"><div class="stat-val">${m}:${String(s).padStart(2,'0')}</div><div class="stat-lbl">Time Survived</div></div>
+  `;
+  document.getElementById('over-best').innerHTML = best
+    ? `Best: Round <span>${best.round}</span> — <span>${Math.floor(best.time/60)}:${String(Math.floor(best.time%60)).padStart(2,'0')}</span>`
+    : '';
+  showScreen('over');
+}
+
+// ── LOCAL STORAGE ─────────────────────────────────────────────
+function getBest() {
+  try { return JSON.parse(localStorage.getItem('spiritChase_best') || 'null'); } catch { return null; }
+}
+function updateBest() {
+  const best = getBest();
+  if (!best || round > best.round || (round === best.round && sessionTime > best.time)) {
+    localStorage.setItem('spiritChase_best', JSON.stringify({ round, time: sessionTime }));
+  }
+}
+function showStartBest() {
+  const best = getBest();
+  const el = document.getElementById('start-best');
+  if (best) {
+    const m = Math.floor(best.time / 60), s = Math.floor(best.time % 60);
+    el.innerHTML = `Best run: Round <span>${best.round}</span> — <span>${m}:${String(s).padStart(2,'0')}</span>`;
+  } else {
+    el.innerHTML = '';
+  }
+}
+
+// ── RENDER ───────────────────────────────────────────────────
+function render() {
+  const W = canvas.width, H = canvas.height;
+  ctx.clearRect(0, 0, W, H);
+
+  if (!mazeGrid) return;
+  const { grid, gRows, gCols } = mazeGrid;
+
+  // Camera centered on player
+  const camX = player.x - W / 2;
+  const camY = player.y - H / 2;
+
+  const half = CELL / 2;
+
+  // Draw floor background
+  ctx.fillStyle = '#0a0514';
+  ctx.fillRect(0, 0, W, H);
+
+  // Determine visible cells (fog of war)
+  const visRadius = pulseActive ? (gRows + gCols) : VISION_RADIUS * 2 + 1;
+  const pGR = Math.round(player.y / half);
+  const pGC = Math.round(player.x / half);
+
+  // Draw maze cells
+  for (let gr = 0; gr < gRows; gr++) {
+    for (let gc = 0; gc < gCols; gc++) {
+      const wx = gc * half;
+      const wy = gr * half;
+      const sx = wx - camX, sy = wy - camY;
+
+      // Cull off-screen
+      if (sx < -CELL || sx > W + CELL || sy < -CELL || sy > H + CELL) continue;
+
+      // Fog of war distance
+      const dr = gr - pGR, dc = gc - pGC;
+      const dist = Math.sqrt(dr * dr + dc * dc);
+
+      const inVision = dist <= visRadius;
+      if (!inVision && !pulseActive) continue;
+
+      const isWall = grid[gr * gCols + gc] === 1;
+
+      if (isWall) {
+        // Wall gradient: darker at edges, lighter purple where visible
+        const alpha = pulseActive ? 0.9 : Math.max(0.1, 1 - dist / (visRadius * 1.4));
+        ctx.globalAlpha = alpha;
+        ctx.fillStyle = '#1a0a2e';
+        ctx.fillRect(sx, sy, half + 1, half + 1);
+
+        // Wall top highlight
+        if (dist < visRadius * 0.7) {
+          ctx.fillStyle = 'rgba(100,50,180,0.15)';
+          ctx.fillRect(sx, sy, half + 1, 2);
+        }
+        ctx.globalAlpha = 1;
+      } else {
+        // Floor
+        const alpha = pulseActive ? 0.9 : Math.max(0.05, 1 - dist / (visRadius * 1.8));
+        ctx.globalAlpha = alpha;
+        ctx.fillStyle = '#0a0514';
+        ctx.fillRect(sx, sy, half + 1, half + 1);
+
+        // Floor grid lines (subtle)
+        if (dist < visRadius * 0.6) {
+          ctx.strokeStyle = 'rgba(50,20,80,0.4)';
+          ctx.lineWidth = 0.5;
+          ctx.strokeRect(sx, sy, half, half);
+        }
+        ctx.globalAlpha = 1;
+      }
+    }
+  }
+
+  // Fog vignette around vision
+  if (!pulseActive) {
+    const gradRadius = (visRadius * half) * 1.1;
+    const px = player.x - camX, py = player.y - camY;
+    const grad = ctx.createRadialGradient(px, py, gradRadius * 0.55, px, py, gradRadius);
+    grad.addColorStop(0, 'rgba(0,0,0,0)');
+    grad.addColorStop(1, 'rgba(0,0,0,0.97)');
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, W, H);
+  }
+
+  // Blue tint when pulse active
+  if (pulseActive) {
+    ctx.fillStyle = 'rgba(6,182,212,0.06)';
+    ctx.fillRect(0, 0, W, H);
+  }
+
+  // ── EXIT portal ──
+  const exSX = exitPos.x - camX, exSY = exitPos.y - camY;
+  if (exSX > -50 && exSX < W + 50 && exSY > -50 && exSY < H + 50) {
+    const exDistToPlayer = Math.sqrt((exitPos.x-player.x)**2 + (exitPos.y-player.y)**2);
+    const exVisible = pulseActive || exDistToPlayer < visRadius * half * 1.1;
+    if (exVisible) {
+      exitAnimAngle += 0.02;
+      // Outer rotating glow
+      for (let ring = 0; ring < 3; ring++) {
+        const ringR = EXIT_RADIUS + ring * 6 + Math.sin(exitAnimAngle * 3 + ring) * 3;
+        const grad = ctx.createRadialGradient(exSX, exSY, 0, exSX, exSY, ringR * 2);
+        grad.addColorStop(0, `rgba(0,255,204,${0.15 - ring * 0.04})`);
+        grad.addColorStop(1, 'rgba(0,255,204,0)');
+        ctx.fillStyle = grad;
+        ctx.beginPath();
+        ctx.arc(exSX, exSY, ringR * 2.5, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      // Portal core
+      ctx.save();
+      ctx.translate(exSX, exSY);
+      ctx.rotate(exitAnimAngle);
+      const portalGrad = ctx.createRadialGradient(0, 0, 0, 0, 0, EXIT_RADIUS);
+      portalGrad.addColorStop(0, '#ffffff');
+      portalGrad.addColorStop(0.3, '#00ffcc');
+      portalGrad.addColorStop(1, 'rgba(0,255,204,0)');
+      ctx.fillStyle = portalGrad;
+      ctx.beginPath();
+      ctx.arc(0, 0, EXIT_RADIUS, 0, Math.PI * 2);
+      ctx.fill();
+      // Rotating spokes
+      ctx.strokeStyle = 'rgba(0,255,204,0.6)';
+      ctx.lineWidth = 2;
+      for (let i = 0; i < 6; i++) {
+        const a = (i / 6) * Math.PI * 2;
+        ctx.beginPath();
+        ctx.moveTo(Math.cos(a) * 5, Math.sin(a) * 5);
+        ctx.lineTo(Math.cos(a) * EXIT_RADIUS, Math.sin(a) * EXIT_RADIUS);
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
+  }
+
+  // ── Spirits ──
+  spirits.forEach((s, si) => {
+    const sDistToPlayer = Math.sqrt((s.x-player.x)**2 + (s.y-player.y)**2);
+    const sVisible = pulseActive || sDistToPlayer < (VISION_RADIUS * 0.85) * half * 1.4;
+    if (!sVisible) return;
+
+    const sx = s.x - camX, sy = s.y - camY;
+
+    // Trail
+    const tLen = s.trailX.length;
+    for (let t = 0; t < tLen; t++) {
+      const tx = s.trailX[t] - camX;
+      const ty = s.trailY[t] - camY;
+      const alpha = (t / tLen) * 0.35;
+      ctx.globalAlpha = alpha;
+      ctx.fillStyle = s.state === 'stunned' ? '#6600cc' : '#cc1111';
+      ctx.beginPath();
+      ctx.arc(tx, ty, SPIRIT_RADIUS * (t / tLen) * 0.7, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+
+    // Outer glow
+    const glowColor = s.state === 'stunned' ? 'rgba(100,0,200,' : 'rgba(200,17,17,';
+    const glowGrad = ctx.createRadialGradient(sx, sy, 0, sx, sy, SPIRIT_RADIUS * 2.5);
+    glowGrad.addColorStop(0, glowColor + '0.4)');
+    glowGrad.addColorStop(1, glowColor + '0)');
+    ctx.fillStyle = glowGrad;
+    ctx.beginPath();
+    ctx.arc(sx, sy, SPIRIT_RADIUS * 2.5, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Spirit body
+    ctx.save();
+    ctx.translate(sx, sy);
+    if (s.state === 'stunned') ctx.rotate(s.spinAngle);
+    const spiritGrad = ctx.createRadialGradient(-3, -3, 0, 0, 0, SPIRIT_RADIUS);
+    if (s.state === 'stunned') {
+      spiritGrad.addColorStop(0, '#cc88ff');
+      spiritGrad.addColorStop(1, '#440088');
+    } else if (s.state === 'chase') {
+      spiritGrad.addColorStop(0, '#ff6666');
+      spiritGrad.addColorStop(1, '#880000');
+    } else {
+      spiritGrad.addColorStop(0, '#dd3333');
+      spiritGrad.addColorStop(1, '#660000');
+    }
+    ctx.fillStyle = spiritGrad;
+    ctx.beginPath();
+    ctx.arc(0, 0, SPIRIT_RADIUS, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Spirit eyes
+    if (s.state !== 'stunned') {
+      ctx.fillStyle = '#ffcc00';
+      ctx.beginPath(); ctx.arc(-4, -3, 2.5, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(4, -3, 2.5, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#000';
+      ctx.beginPath(); ctx.arc(-3.5, -3, 1.2, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(4.5, -3, 1.2, 0, Math.PI * 2); ctx.fill();
+    } else {
+      // X eyes when stunned
+      ctx.strokeStyle = '#cc88ff';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.moveTo(-6,-5); ctx.lineTo(-2,-2); ctx.moveTo(-2,-5); ctx.lineTo(-6,-2); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(2,-5); ctx.lineTo(6,-2); ctx.moveTo(6,-5); ctx.lineTo(2,-2); ctx.stroke();
+    }
+    ctx.restore();
+  });
+
+  // ── Player ──
+  const px = player.x - camX, py = player.y - camY;
+
+  // Player glow
+  const playerGlow = ctx.createRadialGradient(px, py, 0, px, py, PLAYER_RADIUS * 3.5);
+  playerGlow.addColorStop(0, 'rgba(200,210,255,0.35)');
+  playerGlow.addColorStop(1, 'rgba(200,210,255,0)');
+  ctx.fillStyle = playerGlow;
+  ctx.beginPath();
+  ctx.arc(px, py, PLAYER_RADIUS * 3.5, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Invincibility flash
+  const invFlash = invincibleTimer > 0 && Math.floor(invincibleTimer * 8) % 2 === 0;
+  if (!invFlash) {
+    const playerGrad = ctx.createRadialGradient(px - 3, py - 3, 0, px, py, PLAYER_RADIUS);
+    playerGrad.addColorStop(0, '#ffffff');
+    playerGrad.addColorStop(0.5, '#c7d2fe');
+    playerGrad.addColorStop(1, '#6366f1');
+    ctx.fillStyle = playerGrad;
+    ctx.beginPath();
+    ctx.arc(px, py, PLAYER_RADIUS, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Player center dot
+    ctx.fillStyle = '#fff';
+    ctx.beginPath();
+    ctx.arc(px, py, 3, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // ── Particles ──
+  particles.forEach(p => p.draw(ctx, camX, camY));
+
+  // ── Minimap ──
+  renderMinimap();
+}
+
+function renderMinimap() {
+  const mW = miniCanvas.width, mH = miniCanvas.height;
+  miniCtx.fillStyle = 'rgba(5,5,8,0.9)';
+  miniCtx.fillRect(0, 0, mW, mH);
+
+  if (!mazeGrid) return;
+  const { grid, gRows, gCols } = mazeGrid;
+  const cw = mW / gCols, ch = mH / gRows;
+
+  for (let gr = 0; gr < gRows; gr++) {
+    for (let gc = 0; gc < gCols; gc++) {
+      if (grid[gr * gCols + gc] === 1) {
+        miniCtx.fillStyle = '#2a0a4e';
+        miniCtx.fillRect(gc * cw, gr * ch, cw + 0.5, ch + 0.5);
+      }
+    }
+  }
+
+  // Exit
+  const eGC = exitPos.gc, eGR = exitPos.gr;
+  miniCtx.fillStyle = '#00ffcc';
+  miniCtx.beginPath();
+  miniCtx.arc((eGC + 0.5) * cw, (eGR + 0.5) * ch, Math.max(2, cw * 1.5), 0, Math.PI * 2);
+  miniCtx.fill();
+
+  // Player
+  const pMX = (Math.round(player.x / (CELL/2)) + 0.5) * cw;
+  const pMY = (Math.round(player.y / (CELL/2)) + 0.5) * ch;
+  miniCtx.fillStyle = '#c7d2fe';
+  miniCtx.beginPath();
+  miniCtx.arc(pMX, pMY, Math.max(2, cw * 1.5), 0, Math.PI * 2);
+  miniCtx.fill();
+}
+
+// ── GAME LOOP ────────────────────────────────────────────────
+function gameLoop(now) {
+  animId = requestAnimationFrame(gameLoop);
+
+  if (gameState !== 'playing') { render(); return; }
+
+  const dt = Math.min((now - lastTime) / 1000, 0.05);
+  lastTime = now;
+
+  sessionTime += dt;
+  exitAnimAngle += dt * 1.5;
+  if (invincibleTimer > 0) invincibleTimer -= dt;
+
+  // Input
+  const moveLeft  = keys['ArrowLeft']  || keys['a'] || keys['A'];
+  const moveRight = keys['ArrowRight'] || keys['d'] || keys['D'];
+  const moveUp    = keys['ArrowUp']    || keys['w'] || keys['W'];
+  const moveDown  = keys['ArrowDown']  || keys['s'] || keys['S'];
+  isRunning = !!(keys['Shift'] && (moveLeft || moveRight || moveUp || moveDown));
+
+  const speed = isRunning ? RUN_SPEED : BASE_SPEED;
+
+  // Energy
+  if (isRunning) {
+    energy = Math.max(0, energy - RUN_DRAIN * dt);
+    if (energy === 0) isRunning = false; // can't run without energy
+  } else {
+    energy = Math.min(ENERGY_MAX, energy + ENERGY_REGEN * dt);
+  }
+
+  // Movement
+  let dx = 0, dy = 0;
+  if (moveLeft)  dx -= 1;
+  if (moveRight) dx += 1;
+  if (moveUp)    dy -= 1;
+  if (moveDown)  dy += 1;
+  const mag = Math.sqrt(dx*dx + dy*dy);
+  if (mag > 0) { dx /= mag; dy /= mag; }
+
+  const nx = player.x + dx * speed * dt;
+  const ny = player.y + dy * speed * dt;
+  const resolved = resolveCollision(player.x, player.y, nx, ny, PLAYER_RADIUS);
+  player.x = resolved.x;
+  player.y = resolved.y;
+
+  // Footstep sound
+  if (mag > 0) {
+    footstepTimer += dt;
+    const stepRate = isRunning ? 0.22 : 0.38;
+    if (footstepTimer >= stepRate) {
+      footstepTimer = 0;
+      playFootstep();
+    }
+  } else {
+    footstepTimer = 0;
+  }
+
+  // Pulse cooldown
+  if (pulseCooldown > 0) pulseCooldown -= dt;
+  if (pulseTimer > 0) {
+    pulseTimer -= dt;
+    if (pulseTimer <= 0) { pulseActive = false; }
+  }
+
+  // BFS recalc
+  bfsTimer += dt;
+  if (bfsTimer >= BFS_INTERVAL) {
+    bfsTimer = 0;
+    spirits.forEach(s => {
+      // Check if spirit should be alerted
+      const sdx = player.x - s.x, sdy = player.y - s.y;
+      const dist = Math.sqrt(sdx*sdx + sdy*sdy);
+      const hearingRange = isRunning ? CELL * 6 : CELL * 3;
+      const sightRange   = VISION_RADIUS * CELL;
+
+      if (s.state !== 'stunned') {
+        const canHear = dist < hearingRange;
+        const canSee  = dist < sightRange && hasLOS(s.x, s.y, player.x, player.y);
+        if (canHear || canSee) {
+          s.state = 'chase';
+          s.alertTimer = 5.0; // stay alerted for 5s
+        } else if (s.state === 'chase') {
+          s.alertTimer -= BFS_INTERVAL;
+          if (s.alertTimer <= 0) s.state = 'patrol';
+        }
+        updateSpiritPath(s);
+      }
+    });
+  }
+
+  // Move spirits
+  spirits.forEach(s => moveSpirit(s, dt));
+
+  // Spirit-player collision
+  spirits.forEach(s => {
+    if (s.state === 'stunned') return;
+    const sdx = s.x - player.x, sdy = s.y - player.y;
+    const dist = Math.sqrt(sdx*sdx + sdy*sdy);
+    if (dist < PLAYER_RADIUS + SPIRIT_RADIUS) {
+      playerHit();
+    }
+  });
+
+  // Check exit
+  const exDX = exitPos.x - player.x, exDY = exitPos.y - player.y;
+  const exDist = Math.sqrt(exDX*exDX + exDY*exDY);
+  if (exDist < PLAYER_RADIUS + EXIT_RADIUS) {
+    winRound();
+  }
+
+  // Particles
+  particles = particles.filter(p => p.life > 0);
+  particles.forEach(p => p.update(dt));
+
+  updateHUD();
+  render();
+}
+
+// ── CONTROLS ─────────────────────────────────────────────────
+window.addEventListener('keydown', e => {
+  keys[e.key] = true;
+  if (e.key === ' ' || e.code === 'Space') {
+    e.preventDefault();
+    if (gameState === 'playing') triggerPulse();
+  }
+});
+window.addEventListener('keyup', e => { keys[e.key] = false; });
+
+canvas.addEventListener('click', () => {
+  if (gameState === 'playing') triggerPulse();
+});
+
+pulseBtn.addEventListener('click', () => {
+  if (gameState === 'playing') triggerPulse();
+});
+
+// ── SCREEN BUTTONS ───────────────────────────────────────────
+document.getElementById('btn-start').addEventListener('click', () => {
+  initGame();
+  gameState = 'playing';
+  showScreen(null);
+  Object.values(screens).forEach(el => el.classList.add('hidden'));
+  lastTime = performance.now();
+  if (!animId) requestAnimationFrame(gameLoop);
+});
+
+document.getElementById('btn-next').addEventListener('click', () => {
+  round++;
+  const prevEnergy = energy;
+  initRound(round);
+  energy = Math.min(ENERGY_MAX, prevEnergy); // carry over energy
+  gameState = 'playing';
+  showScreen(null);
+  Object.values(screens).forEach(el => el.classList.add('hidden'));
+  lastTime = performance.now();
+});
+
+document.getElementById('btn-retry').addEventListener('click', () => {
+  initGame();
+  gameState = 'playing';
+  showScreen(null);
+  Object.values(screens).forEach(el => el.classList.add('hidden'));
+  lastTime = performance.now();
+});
+
+// ── INIT ──────────────────────────────────────────────────────
+showStartBest();
+showScreen('start');
+requestAnimationFrame(gameLoop);
+</script>
+<script>(function(){
+  var id='spirit-chase';
+  var p=parseInt(localStorage.getItem('nexus_plays_'+id)||'0')+1;
+  localStorage.setItem('nexus_plays_'+id,p);
+  var el=document.createElement('div');
+  el.id='nexus-rating-widget';
+  el.style.cssText='position:fixed;bottom:16px;right:16px;z-index:9999;background:rgba(5,5,20,.92);border:1px solid rgba(99,102,241,.3);border-radius:10px;padding:8px 14px;display:flex;align-items:center;gap:8px;font-family:Inter,sans-serif;font-size:.75rem;color:#94a3b8;backdrop-filter:blur(8px);';
+  var votes=JSON.parse(localStorage.getItem('nexus_rating_'+id)||'[]');
+  var myVote=parseInt(localStorage.getItem('nexus_myrating_'+id)||'0');
+  el.innerHTML='<span style="letter-spacing:.06em;font-weight:700;">RATE</span><span id="nrs"></span>';
+  document.body.appendChild(el);
+  function render(){
+    var stars='';
+    for(var i=1;i<=5;i++){
+      var c=i<=(myVote||0)?'#f59e0b':'rgba(255,255,255,.2)';
+      stars+='<span data-v="'+i+'" style="cursor:pointer;font-size:1.1rem;color:'+c+';transition:color .1s;">★</span>';
+    }
+    document.getElementById('nrs').innerHTML=stars;
+    document.querySelectorAll('#nexus-rating-widget [data-v]').forEach(function(s){
+      s.addEventListener('click',function(){
+        var v=parseInt(this.getAttribute('data-v'));
+        if(!myVote){votes.push(v);localStorage.setItem('nexus_rating_'+id,JSON.stringify(votes));}
+        else{var idx=votes.indexOf(myVote);if(idx>-1)votes.splice(idx,1,v);localStorage.setItem('nexus_rating_'+id,JSON.stringify(votes));}
+        myVote=v;localStorage.setItem('nexus_myrating_'+id,v);render();
+      });
+    });
+  }
+  render();
+})();</script>
+</body>
+</html>
