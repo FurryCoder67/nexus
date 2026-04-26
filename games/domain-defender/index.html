@@ -786,11 +786,10 @@ idleDraw();
   window.placeTower = function(def, row, col) {
     _origPlaceTower(def, row, col);
     if (mpActive) {
-      NexusMP.send('towers/' + row + '_' + col, {
+      NexusMP.send('tower', {
         defId: def.id,
         row, col,
         placedBy: NexusMP.myId,
-        ts: Date.now(),
       });
     }
   };
@@ -819,7 +818,7 @@ idleDraw();
   // ── Sync lives & CE ───────────────────────────────────────────────────────
   setInterval(() => {
     if (!mpActive || gamePhase !== 'playing') return;
-    NexusMP.send('gamestate', { lives, ce, wave, score, kills, ts: Date.now(), by: NexusMP.myId });
+    NexusMP.send('gamestate', { lives, ce, wave, score, kills, by: NexusMP.myId });
   }, 1000);
 
   // ── Multiplayer UI ────────────────────────────────────────────────────────
@@ -886,13 +885,9 @@ idleDraw();
     updatePlayerList();
 
     // Listen for opponent tower placements
-    NexusMP.on('towers', (data) => {
-      if (!data) return;
-      for (const [key, tData] of Object.entries(data)) {
-        if (tData && tData.placedBy !== NexusMP.myId) {
-          applyRemoteTower(tData);
-        }
-      }
+    NexusMP.on('tower', (data) => {
+      if (!data || data.placedBy === NexusMP.myId) return;
+      applyRemoteTower(data);
     });
 
     // Listen for opponent game state
@@ -914,11 +909,10 @@ idleDraw();
       // Sync current tower state to new player
       if (NexusMP.isHost) {
         towers.forEach(t => {
-          NexusMP.send('towers/' + t.row + '_' + t.col, {
+          NexusMP.send('tower', {
             defId: t.defId || t.id,
             row: t.row, col: t.col,
             placedBy: NexusMP.myId,
-            ts: Date.now(),
           });
         });
       }
@@ -936,11 +930,17 @@ idleDraw();
     try {
       const { roomCode } = await NexusMP.init(GAME_ID, name);
       setStatus('Waiting for ally…', '#22c55e');
-      const codeEl = document.createElement('div');
-      codeEl.className = 'mp-code'; codeEl.textContent = roomCode;
-      document.getElementById('mp-players').before(codeEl);
+      showCode(roomCode);
       onConnected();
     } catch(e) { setStatus('Error: ' + e.message, '#ef4444'); }
+  }
+
+  function showCode(code) {
+    const existing = document.getElementById('mp-room-code');
+    if (existing) return;
+    const el = document.createElement('div');
+    el.id = 'mp-room-code'; el.className = 'mp-code'; el.textContent = code;
+    document.getElementById('mp-status').before(el);
   }
 
   async function joinDefense() {

@@ -1066,7 +1066,7 @@ idleDraw();
   const _origKillEnemy = window.killEnemy;
   window.killEnemy = function(e) {
     if (mpActive && e.mpId) {
-      NexusMP.send('kill/' + e.mpId, { killer: NexusMP.myId, ts: Date.now() });
+      NexusMP.send('kill', { mpId: e.mpId, killer: NexusMP.myId });
     }
     _origKillEnemy(e);
   };
@@ -1157,12 +1157,8 @@ idleDraw();
 
     // Listen for opponent kills
     NexusMP.on('kill', (data) => {
-      if (!data) return;
-      for (const [mpId, killData] of Object.entries(data)) {
-        if (killData && killData.killer !== NexusMP.myId) {
-          onOpponentKill(mpId);
-        }
-      }
+      if (!data || data.killer === NexusMP.myId) return;
+      onOpponentKill(data.mpId);
     });
 
     NexusMP.onPlayerJoin((id, p) => {
@@ -1182,11 +1178,17 @@ idleDraw();
     try {
       const { roomCode } = await NexusMP.init(GAME_ID, name);
       setStatus('Waiting for ally…', '#22c55e');
-      const codeEl = document.createElement('div');
-      codeEl.className = 'mp-code'; codeEl.textContent = roomCode;
-      document.getElementById('mp-players').before(codeEl);
+      showCode(roomCode);
       onConnected();
     } catch(e) { setStatus('Error: ' + e.message, '#ef4444'); }
+  }
+
+  function showCode(code) {
+    const existing = document.getElementById('mp-room-code');
+    if (existing) return;
+    const el = document.createElement('div');
+    el.id = 'mp-room-code'; el.className = 'mp-code'; el.textContent = code;
+    document.getElementById('mp-status').before(el);
   }
 
   async function joinCoop() {
@@ -1215,7 +1217,6 @@ idleDraw();
       wave: state.wave,
       x: state.player.x,
       y: state.player.y,
-      ts: Date.now(),
     });
   }, 200);
 

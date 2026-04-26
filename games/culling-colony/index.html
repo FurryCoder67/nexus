@@ -1539,28 +1539,21 @@ ctx.fillRect(0,0,canvas.width,canvas.height);
     updatePlayerList();
 
     // Listen for all player states
-    NexusMP.on('pstate', (data) => {
-      if (!data) return;
-      for (const [id, pData] of Object.entries(data)) {
-        if (id === NexusMP.myId) continue;
-        if (!remotePlayers.has(id)) {
-          remotePlayers.set(id, { color: COLORS[colorIdx++ % COLORS.length] });
-        }
-        Object.assign(remotePlayers.get(id), pData);
+    NexusMP.on('pstate', (data, fromId) => {
+      if (!data || data.id === NexusMP.myId) return;
+      const peerId = data.id || fromId;
+      if (!remotePlayers.has(peerId)) {
+        remotePlayers.set(peerId, { color: COLORS[colorIdx++ % COLORS.length] });
       }
+      Object.assign(remotePlayers.get(peerId), data);
     });
 
     // Listen for kills
-    NexusMP.on('kills', (data) => {
-      if (!data) return;
-      for (const [id, killData] of Object.entries(data)) {
-        if (killData && killData.victim && killData.killer !== NexusMP.myId) {
-          // Mark remote player as dead
-          const rp = remotePlayers.get(killData.victim);
-          if (rp) rp.alive = false;
-          addKillFeed(`${killData.killerName} eliminated ${killData.victimName}`);
-        }
-      }
+    NexusMP.on('kill', (data) => {
+      if (!data || data.killer === NexusMP.myId) return;
+      const rp = remotePlayers.get(data.victim);
+      if (rp) rp.alive = false;
+      addKillFeed(`${data.killerName} eliminated ${data.victimName}`);
     });
 
     NexusMP.onPlayerJoin((id, p) => {
@@ -1581,11 +1574,17 @@ ctx.fillRect(0,0,canvas.width,canvas.height);
     try {
       const { roomCode } = await NexusMP.init(GAME_ID, name);
       setStatus('Waiting for players…', '#10b981');
-      const codeEl = document.createElement('div');
-      codeEl.className = 'mp-code'; codeEl.textContent = roomCode;
-      document.getElementById('mp-players').before(codeEl);
+      showCode(roomCode);
       onConnected();
     } catch(e) { setStatus('Error: ' + e.message, '#ef4444'); }
+  }
+
+  function showCode(code) {
+    const existing = document.getElementById('mp-room-code');
+    if (existing) return;
+    const el = document.createElement('div');
+    el.id = 'mp-room-code'; el.className = 'mp-code'; el.textContent = code;
+    document.getElementById('mp-status').before(el);
   }
 
   async function joinMatch() {
@@ -1615,13 +1614,13 @@ ctx.fillRect(0,0,canvas.width,canvas.height);
     if (now - _lastBroadcast > 50) {
       _lastBroadcast = now;
       const p = G.player;
-      NexusMP.send('pstate/' + NexusMP.myId, {
+      NexusMP.send('pstate', {
+        id: NexusMP.myId,
         x: Math.round(p.x), y: Math.round(p.y),
         hp: Math.round(p.hp), alive: p.alive,
         kills: p.kills || 0,
         name: localStorage.getItem('nexus_playername') || 'Sorcerer',
         techIdx: selectedTechIdx,
-        ts: now,
       });
     }
 
@@ -1662,12 +1661,11 @@ ctx.fillRect(0,0,canvas.width,canvas.height);
   window.eliminatePlayer = function(entity, killer) {
     _origEliminatePlayer(entity, killer);
     if (mpActive && killer && killer.isPlayer) {
-      NexusMP.send('kills/' + Date.now(), {
+      NexusMP.send('kill', {
         killer: NexusMP.myId,
         killerName: localStorage.getItem('nexus_playername') || 'Sorcerer',
         victim: entity.mpId || entity.name,
         victimName: entity.name,
-        ts: Date.now(),
       });
     }
   };

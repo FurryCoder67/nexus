@@ -2587,6 +2587,143 @@
         });
     }
     </script>
+<script src="../nexus-config.js"></script>
+<script src="../nexus-mp.js"></script>
+<script>
+// ── HUNTERS MULTIPLAYER — Firebase Lobby + Railway WebSocket ──────────────────
+(function(){
+  const GAME_ID = 'hunters';
+  const RAILWAY_URL = window.NEXUS_HUNTERS_WS || '';
+
+  const panel = document.createElement('div');
+  panel.id = 'mp-panel';
+  panel.innerHTML = `
+    <style>
+      #mp-panel{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);z-index:4000;font-family:'Segoe UI',sans-serif;}
+      #mp-toggle{background:linear-gradient(135deg,rgba(124,58,237,.9),rgba(6,182,212,.7));border:none;border-radius:10px;padding:8px 22px;color:#fff;font-size:.78rem;font-weight:700;letter-spacing:.1em;cursor:pointer;box-shadow:0 0 20px rgba(124,58,237,.4);}
+      #mp-box{position:absolute;bottom:44px;left:50%;transform:translateX(-50%);width:280px;background:rgba(4,2,10,.97);border:1px solid rgba(124,58,237,.4);border-radius:12px;padding:16px;display:none;backdrop-filter:blur(16px);}
+      #mp-box.open{display:block;}
+      .mp-title{font-size:.8rem;font-weight:900;letter-spacing:.12em;text-transform:uppercase;color:#c4b5fd;margin-bottom:12px;text-align:center;}
+      .mp-label{font-size:.62rem;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#94a3b8;margin-bottom:3px;}
+      .mp-input{width:100%;background:rgba(124,58,237,.08);border:1px solid rgba(124,58,237,.3);border-radius:7px;padding:7px 10px;color:#fff;font-size:.8rem;margin-bottom:8px;outline:none;}
+      .mp-btn{width:100%;padding:9px;border-radius:8px;border:none;font-size:.75rem;font-weight:700;cursor:pointer;margin-bottom:6px;letter-spacing:.08em;}
+      .mp-btn-host{background:linear-gradient(135deg,#7c3aed,#9d5cf6);color:#fff;}
+      .mp-btn-join{background:rgba(124,58,237,.15);border:1px solid rgba(124,58,237,.35);color:#c4b5fd;}
+      .mp-status{font-size:.7rem;color:#94a3b8;text-align:center;margin-top:4px;}
+      .mp-code{font-size:1.1rem;font-weight:900;color:#06b6d4;text-align:center;letter-spacing:.25em;padding:6px;background:rgba(6,182,212,.1);border-radius:7px;margin:6px 0;}
+      .mp-player-row{display:flex;align-items:center;gap:6px;padding:3px 0;font-size:.72rem;color:#e8e0ff;}
+      .mp-dot{width:7px;height:7px;border-radius:50%;background:#10b981;flex-shrink:0;}
+      .mp-dot.opp{background:#7c3aed;}
+      .mp-divider{height:1px;background:rgba(124,58,237,.2);margin:8px 0;}
+      .mp-score-row{display:flex;justify-content:space-between;font-size:.7rem;color:#94a3b8;padding:2px 0;}
+      .mp-score-row span{color:#e8e0ff;font-weight:700;}
+    </style>
+    <button id="mp-toggle">⚡ MULTIPLAYER</button>
+    <div id="mp-box">
+      <div class="mp-title">⚔️ HUNTERS MULTIPLAYER</div>
+      <div class="mp-label">Your Name</div>
+      <input class="mp-input" id="mp-name" placeholder="Hunter" maxlength="16" value="${window.NEXUS_PLAYER_NAME||'Hunter'}">
+      <button class="mp-btn mp-btn-host" id="mp-host-btn">🏠 CREATE ROOM</button>
+      <div class="mp-label">Join with code</div>
+      <input class="mp-input" id="mp-code-input" placeholder="ABC123" maxlength="6" style="text-transform:uppercase;letter-spacing:.18em;">
+      <button class="mp-btn mp-btn-join" id="mp-join-btn">→ JOIN ROOM</button>
+      <div class="mp-status" id="mp-status">Not connected</div>
+      <div id="mp-players" style="margin-top:8px;"></div>
+      <div class="mp-divider"></div>
+      <div id="mp-scores"></div>
+    </div>
+  `;
+  document.body.appendChild(panel);
+
+  document.getElementById('mp-toggle').onclick = () => document.getElementById('mp-box').classList.toggle('open');
+
+  function setStatus(msg, color) {
+    const el = document.getElementById('mp-status');
+    el.textContent = msg; el.style.color = color || '#94a3b8';
+  }
+
+  function updatePlayerList() {
+    const el = document.getElementById('mp-players');
+    let html = '';
+    NexusMP.players.forEach((p, id) => {
+      const isMe = id === NexusMP.myId;
+      html += `<div class="mp-player-row"><div class="mp-dot${isMe?'':' opp'}"></div>${p.name}${isMe?' (you)':''}</div>`;
+    });
+    el.innerHTML = html;
+  }
+
+  function updateScores() {
+    const el = document.getElementById('mp-scores');
+    if (!el) return;
+    let html = '<div style="font-size:.62rem;font-weight:700;letter-spacing:.1em;color:#94a3b8;margin-bottom:4px;">LIVE SCORES</div>';
+    NexusMP.players.forEach((p) => {
+      html += `<div class="mp-score-row">${p.name}: <span>${p.kills||0} kills · ${p.score||0} pts</span></div>`;
+    });
+    el.innerHTML = html;
+  }
+
+  function onConnected() {
+    updatePlayerList();
+    NexusMP.on('scores', (data) => {
+      if (!data || !data.id) return;
+      const p = NexusMP.players.get(data.id);
+      if (p) Object.assign(p, data);
+      updateScores();
+    });
+    NexusMP.onPlayerJoin((id, p) => {
+      updatePlayerList();
+      setStatus(`${p.name} joined!`, '#10b981');
+      if (RAILWAY_URL && window.MultiplayerClient) {
+        window.MultiplayerClient.connect(RAILWAY_URL, localStorage.getItem('nexus_playername') || 'Hunter');
+      }
+    });
+    NexusMP.onPlayerLeave(() => updatePlayerList());
+    setInterval(() => {
+      if (!NexusMP.myId) return;
+      const kills = window.G && window.G.kills ? window.G.kills : 0;
+      const score = window.G && window.G.score ? window.G.score : 0;
+      NexusMP.send('scores', { id: NexusMP.myId, kills, score, name: localStorage.getItem('nexus_playername') || 'Hunter' });
+      updateScores();
+    }, 2000);
+  }
+
+  async function createRoom() {
+    const name = document.getElementById('mp-name').value.trim() || 'Hunter';
+    localStorage.setItem('nexus_playername', name);
+    setStatus('Creating room…', '#7c3aed');
+    try {
+      const { roomCode } = await NexusMP.init(GAME_ID, name);
+      setStatus('Room created! Share the code.', '#10b981');
+      showCode(roomCode);
+      onConnected();
+    } catch(e) { setStatus('Error: ' + e.message, '#ef4444'); }
+  }
+
+  function showCode(code) {
+    const existing = document.getElementById('mp-room-code');
+    if (existing) return;
+    const el = document.createElement('div');
+    el.id = 'mp-room-code'; el.className = 'mp-code'; el.textContent = code;
+    document.getElementById('mp-status').before(el);
+  }
+
+  async function joinRoom() {
+    const name = document.getElementById('mp-name').value.trim() || 'Hunter';
+    const code = document.getElementById('mp-code-input').value.trim().toUpperCase();
+    if (!code) { setStatus('Enter a room code', '#ef4444'); return; }
+    localStorage.setItem('nexus_playername', name);
+    setStatus('Joining…', '#7c3aed');
+    try {
+      await NexusMP.join(GAME_ID, code, name);
+      setStatus('Connected!', '#10b981');
+      onConnected();
+    } catch(e) { setStatus('Error: ' + e.message, '#ef4444'); }
+  }
+
+  document.getElementById('mp-host-btn').onclick = createRoom;
+  document.getElementById('mp-join-btn').onclick = joinRoom;
+})();
+</script>
 <script>(function(){
   var id='hunters';
   var p=parseInt(localStorage.getItem('nexus_plays_'+id)||'0')+1;

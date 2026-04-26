@@ -1604,6 +1604,27 @@ requestAnimationFrame(gameLoop);
     if (duration) setTimeout(() => b.style.display = 'none', duration);
   }
 
+  function setupListeners() {
+    NexusMP.on('opponent', (data) => {
+      if (data && data.id !== NexusMP.myId) opponentGhost = data;
+    });
+    NexusMP.on('result', (data) => {
+      if (data && data.winner && data.winner !== NexusMP.myId) {
+        showRaceBanner('👻 OPPONENT WINS', `${data.winnerName} escaped first!`, 4000);
+      }
+    });
+    NexusMP.on('seed', (data) => {
+      if (data && data.seed && !NexusMP.isHost) {
+        mazeSeed = data.seed;
+      }
+    });
+  }
+
+  function startRace() {
+    raceStarted = true;
+    if (typeof initRound === 'function') { round = 1; initRound(1); gameState = 'playing'; }
+  }
+
   async function hostRace() {
     const name = document.getElementById('mp-name').value.trim() || 'Sorcerer';
     localStorage.setItem('nexus_playername', name);
@@ -1611,31 +1632,19 @@ requestAnimationFrame(gameLoop);
     try {
       const { roomCode } = await NexusMP.init(GAME_ID, name);
       mpActive = true;
-      mazeSeed = Date.now() % 999983; // prime-modded seed
-      await NexusMP.set('seed', mazeSeed);
+      mazeSeed = Date.now() % 999983;
       setStatus('Waiting for opponent…', '#10b981');
-      document.getElementById('mp-box').innerHTML += `<div class="mp-code">${roomCode}</div><div class="mp-status" style="color:#94a3b8;font-size:.68rem;text-align:center">Share this code!</div>`;
+      showCode(roomCode);
       updatePlayerList();
+      setupListeners();
 
       NexusMP.onPlayerJoin((id, p) => {
         updatePlayerList();
         setStatus(`${p.name} joined! Starting…`, '#10b981');
+        // Send seed to joiner
+        NexusMP.send('seed', { seed: mazeSeed });
         showRaceBanner('RACE STARTING!', 'Same maze — first to exit wins!', 3000);
-        setTimeout(() => {
-          raceStarted = true;
-          // Restart with shared seed
-          if (typeof startRound === 'function') startRound();
-          else if (typeof initRound === 'function') { round = 1; initRound(1); gameState = 'playing'; }
-        }, 3000);
-      });
-
-      NexusMP.on('opponent', (data) => {
-        if (data && data.id !== NexusMP.myId) opponentGhost = data;
-      });
-      NexusMP.on('result', (data) => {
-        if (data && data.winner && data.winner !== NexusMP.myId) {
-          showRaceBanner('👻 OPPONENT WINS', `${data.winnerName} escaped first!`, 4000);
-        }
+        setTimeout(startRace, 3000);
       });
     } catch(e) {
       setStatus('Error: ' + e.message, '#ef4444');
@@ -1651,27 +1660,30 @@ requestAnimationFrame(gameLoop);
     try {
       await NexusMP.join(GAME_ID, code, name);
       mpActive = true;
-      mazeSeed = await NexusMP.getState('seed');
-      setStatus('Connected! Race starting…', '#10b981');
+      setStatus('Connected! Waiting for seed…', '#10b981');
       updatePlayerList();
-      showRaceBanner('RACE STARTING!', 'Same maze — first to exit wins!', 3000);
-      setTimeout(() => {
-        raceStarted = true;
-        if (typeof startRound === 'function') startRound();
-        else if (typeof initRound === 'function') { round = 1; initRound(1); gameState = 'playing'; }
-      }, 3000);
-
-      NexusMP.on('opponent', (data) => {
-        if (data && data.id !== NexusMP.myId) opponentGhost = data;
-      });
-      NexusMP.on('result', (data) => {
-        if (data && data.winner && data.winner !== NexusMP.myId) {
-          showRaceBanner('👻 OPPONENT WINS', `${data.winnerName} escaped first!`, 4000);
+      setupListeners();
+      // Seed arrives via 'seed' channel from host
+      NexusMP.on('seed', (data) => {
+        if (data && data.seed) {
+          mazeSeed = data.seed;
+          showRaceBanner('RACE STARTING!', 'Same maze — first to exit wins!', 3000);
+          setTimeout(startRace, 3000);
         }
       });
     } catch(e) {
       setStatus('Error: ' + e.message, '#ef4444');
     }
+  }
+
+  function showCode(code) {
+    const existing = document.getElementById('mp-room-code');
+    if (existing) return;
+    const el = document.createElement('div');
+    el.id = 'mp-room-code';
+    el.className = 'mp-code';
+    el.textContent = code;
+    document.getElementById('mp-status').before(el);
   }
 
   document.getElementById('mp-host-btn').onclick = hostRace;
@@ -1720,7 +1732,7 @@ requestAnimationFrame(gameLoop);
     window.showScreen = function(name) {
       _origShowScreen(name);
       if (name === 'over' && mpActive) {
-        NexusMP.set('result', { winner: NexusMP.myId, winnerName: localStorage.getItem('nexus_playername') || 'Sorcerer' });
+        NexusMP.send('result', { winner: NexusMP.myId, winnerName: localStorage.getItem('nexus_playername') || 'Sorcerer' });
         showRaceBanner('🏆 YOU WIN!', 'You escaped the domain first!', 4000);
       }
     };
