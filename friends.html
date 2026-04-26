@@ -1,0 +1,560 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Friends — NEXUS</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+    <script src="/games/nexus-config.js"></script>
+    <script src="/games/nexus-auth.js"></script>
+    <script src="/games/nexus-friends.js"></script>
+    <style>
+        *,
+        *::before,
+        *::after {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        :root {
+            --bg: #06040f;
+            --card: #0f0b1a;
+            --card-hover: #161224;
+            --accent: #7c3aed;
+            --accent2: #06b6d4;
+            --text: #f1f5f9;
+            --muted: #64748b;
+            --border: rgba(124, 58, 237, 0.2);
+            --success: #22c55e;
+            --error: #ef4444;
+        }
+
+        body {
+            background: var(--bg);
+            color: var(--text);
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 32px;
+        }
+
+        .title {
+            font-size: 32px;
+            font-weight: 900;
+            color: var(--text);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .back-btn {
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 10px 20px;
+            color: var(--text);
+            text-decoration: none;
+            font-size: 14px;
+            font-weight: 600;
+            transition: all 0.2s ease;
+        }
+
+        .back-btn:hover {
+            background: rgba(255, 255, 255, 0.12);
+            border-color: var(--accent);
+        }
+
+        .search-box {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 24px;
+            margin-bottom: 24px;
+        }
+
+        .search-input {
+            width: 100%;
+            padding: 12px 16px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            color: var(--text);
+            font-size: 14px;
+            outline: none;
+            transition: border-color 0.2s ease;
+        }
+
+        .search-input:focus {
+            border-color: var(--accent);
+        }
+
+        .tabs {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 24px;
+        }
+
+        .tab {
+            padding: 10px 20px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            color: var(--muted);
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .tab.active {
+            background: var(--accent);
+            border-color: var(--accent);
+            color: #fff;
+        }
+
+        .section {
+            display: none;
+        }
+
+        .section.active {
+            display: block;
+        }
+
+        .friends-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 16px;
+        }
+
+        .friend-card {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 20px;
+            transition: all 0.2s ease;
+        }
+
+        .friend-card:hover {
+            background: var(--card-hover);
+            border-color: var(--accent);
+        }
+
+        .friend-header {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            margin-bottom: 16px;
+        }
+
+        .friend-avatar {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, var(--accent), var(--accent2));
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            font-weight: 700;
+            flex-shrink: 0;
+        }
+
+        .friend-info {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .friend-name {
+            font-size: 18px;
+            font-weight: 700;
+            color: var(--text);
+            margin-bottom: 4px;
+        }
+
+        .friend-status {
+            font-size: 13px;
+            color: var(--muted);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--success);
+        }
+
+        .friend-actions {
+            display: flex;
+            gap: 8px;
+        }
+
+        .btn {
+            padding: 8px 16px;
+            border-radius: 6px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            border: none;
+            flex: 1;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, var(--accent), #9d5cf6);
+            color: #fff;
+        }
+
+        .btn-primary:hover {
+            opacity: 0.9;
+        }
+
+        .btn-secondary {
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid var(--border);
+            color: var(--text);
+        }
+
+        .btn-secondary:hover {
+            background: rgba(255, 255, 255, 0.12);
+        }
+
+        .btn-danger {
+            background: rgba(239, 68, 68, 0.1);
+            border: 1px solid rgba(239, 68, 68, 0.3);
+            color: var(--error);
+        }
+
+        .btn-danger:hover {
+            background: rgba(239, 68, 68, 0.2);
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: var(--muted);
+        }
+
+        .empty-icon {
+            font-size: 48px;
+            margin-bottom: 16px;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: var(--muted);
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <div class="header">
+            <h1 class="title">👥 Friends</h1>
+            <a href="/" class="back-btn">← Back to NEXUS</a>
+        </div>
+
+        <div class="search-box">
+            <input type="text" id="search-input" class="search-input" placeholder="Search players by name...">
+            <div id="search-results" style="margin-top: 16px;"></div>
+        </div>
+
+        <div class="tabs">
+            <button class="tab active" data-tab="friends">My Friends</button>
+            <button class="tab" data-tab="requests">Friend Requests</button>
+            <button class="tab" data-tab="sent">Sent Requests</button>
+        </div>
+
+        <div class="section active" id="friends-section">
+            <div class="loading" id="friends-loading">Loading friends...</div>
+            <div class="friends-grid" id="friends-list"></div>
+        </div>
+
+        <div class="section" id="requests-section">
+            <div class="loading" id="requests-loading">Loading requests...</div>
+            <div class="friends-grid" id="requests-list"></div>
+        </div>
+
+        <div class="section" id="sent-section">
+            <div class="loading" id="sent-loading">Loading sent requests...</div>
+            <div class="friends-grid" id="sent-list"></div>
+        </div>
+    </div>
+
+    <script>
+        let searchTimeout;
+
+        // Tab switching
+        document.querySelectorAll('.tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                const targetTab = tab.dataset.tab;
+
+                document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+                document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+
+                tab.classList.add('active');
+                document.getElementById(targetTab + '-section').classList.add('active');
+            });
+        });
+
+        // Search players
+        document.getElementById('search-input').addEventListener('input', (e) => {
+            clearTimeout(searchTimeout);
+            const query = e.target.value.trim();
+
+            if (query.length < 2) {
+                document.getElementById('search-results').innerHTML = '';
+                return;
+            }
+
+            searchTimeout = setTimeout(async () => {
+                try {
+                    const results = await NexusFriends.searchPlayers(query);
+                    displaySearchResults(results);
+                } catch (error) {
+                    console.error('Search error:', error);
+                }
+            }, 300);
+        });
+
+        function displaySearchResults(results) {
+            const container = document.getElementById('search-results');
+
+            if (results.length === 0) {
+                container.innerHTML = '<div class="empty-state"><div class="empty-icon">🔍</div><p>No players found</p></div>';
+                return;
+            }
+
+            container.innerHTML = '<div class="friends-grid">' + results.map(player => {
+                const initial = player.displayName.charAt(0).toUpperCase();
+                let actionBtn = '';
+
+                if (player.friendshipStatus === 'accepted') {
+                    actionBtn = '<button class="btn btn-secondary" disabled>Already Friends</button>';
+                } else if (player.friendshipStatus === 'pending') {
+                    if (player.isSender) {
+                        actionBtn = '<button class="btn btn-secondary" disabled>Request Sent</button>';
+                    } else {
+                        actionBtn = '<button class="btn btn-primary" onclick="acceptRequest(\'' + player.id + '\')">Accept Request</button>';
+                    }
+                } else {
+                    actionBtn = '<button class="btn btn-primary" onclick="sendRequest(\'' + player.id + '\')">Add Friend</button>';
+                }
+
+                return `
+          <div class="friend-card">
+            <div class="friend-header">
+              <div class="friend-avatar">${initial}</div>
+              <div class="friend-info">
+                <div class="friend-name">${player.displayName}</div>
+                <div class="friend-status">Level ${player.level} • ${player.xp} XP</div>
+              </div>
+            </div>
+            <div class="friend-actions">
+              ${actionBtn}
+            </div>
+          </div>
+        `;
+            }).join('') + '</div>';
+        }
+
+        async function sendRequest(friendId) {
+            try {
+                await NexusFriends.sendFriendRequest(friendId);
+                alert('Friend request sent!');
+                document.getElementById('search-input').value = '';
+                document.getElementById('search-results').innerHTML = '';
+                loadSentRequests();
+            } catch (error) {
+                alert(error.message || 'Failed to send friend request');
+            }
+        }
+
+        async function acceptRequest(friendshipId) {
+            try {
+                await NexusFriends.acceptFriendRequest(friendshipId);
+                alert('Friend request accepted!');
+                loadFriends();
+                loadPendingRequests();
+            } catch (error) {
+                alert(error.message || 'Failed to accept friend request');
+            }
+        }
+
+        async function rejectRequest(friendshipId) {
+            if (!confirm('Reject this friend request?')) return;
+
+            try {
+                await NexusFriends.rejectFriendRequest(friendshipId);
+                loadPendingRequests();
+            } catch (error) {
+                alert(error.message || 'Failed to reject friend request');
+            }
+        }
+
+        async function removeFriend(friendshipId, name) {
+            if (!confirm(`Remove ${name} from friends?`)) return;
+
+            try {
+                await NexusFriends.removeFriend(friendshipId);
+                loadFriends();
+            } catch (error) {
+                alert(error.message || 'Failed to remove friend');
+            }
+        }
+
+        async function loadFriends() {
+            const container = document.getElementById('friends-list');
+            const loading = document.getElementById('friends-loading');
+
+            try {
+                loading.style.display = 'block';
+                const friends = await NexusFriends.getFriends();
+                loading.style.display = 'none';
+
+                if (friends.length === 0) {
+                    container.innerHTML = '<div class="empty-state"><div class="empty-icon">👥</div><p>No friends yet. Search for players to add!</p></div>';
+                    return;
+                }
+
+                container.innerHTML = friends.map(friend => {
+                    const initial = friend.displayName.charAt(0).toUpperCase();
+                    return `
+            <div class="friend-card">
+              <div class="friend-header">
+                <div class="friend-avatar">${initial}</div>
+                <div class="friend-info">
+                  <div class="friend-name">${friend.displayName}</div>
+                  <div class="friend-status">
+                    <span class="status-dot"></span>
+                    Level ${friend.level} • ${friend.xp} XP
+                  </div>
+                </div>
+              </div>
+              <div class="friend-actions">
+                <button class="btn btn-secondary">Message</button>
+                <button class="btn btn-danger" onclick="removeFriend('${friend.friendshipId}', '${friend.displayName}')">Remove</button>
+              </div>
+            </div>
+          `;
+                }).join('');
+            } catch (error) {
+                loading.style.display = 'none';
+                container.innerHTML = '<div class="empty-state"><div class="empty-icon">⚠️</div><p>Failed to load friends</p></div>';
+                console.error('Load friends error:', error);
+            }
+        }
+
+        async function loadPendingRequests() {
+            const container = document.getElementById('requests-list');
+            const loading = document.getElementById('requests-loading');
+
+            try {
+                loading.style.display = 'block';
+                const requests = await NexusFriends.getPendingRequests();
+                loading.style.display = 'none';
+
+                if (requests.length === 0) {
+                    container.innerHTML = '<div class="empty-state"><div class="empty-icon">📭</div><p>No pending friend requests</p></div>';
+                    return;
+                }
+
+                container.innerHTML = requests.map(request => {
+                    const initial = request.displayName.charAt(0).toUpperCase();
+                    return `
+            <div class="friend-card">
+              <div class="friend-header">
+                <div class="friend-avatar">${initial}</div>
+                <div class="friend-info">
+                  <div class="friend-name">${request.displayName}</div>
+                  <div class="friend-status">Level ${request.level} • ${request.xp} XP</div>
+                </div>
+              </div>
+              <div class="friend-actions">
+                <button class="btn btn-primary" onclick="acceptRequest('${request.friendshipId}')">Accept</button>
+                <button class="btn btn-danger" onclick="rejectRequest('${request.friendshipId}')">Reject</button>
+              </div>
+            </div>
+          `;
+                }).join('');
+            } catch (error) {
+                loading.style.display = 'none';
+                container.innerHTML = '<div class="empty-state"><div class="empty-icon">⚠️</div><p>Failed to load requests</p></div>';
+                console.error('Load requests error:', error);
+            }
+        }
+
+        async function loadSentRequests() {
+            const container = document.getElementById('sent-list');
+            const loading = document.getElementById('sent-loading');
+
+            try {
+                loading.style.display = 'block';
+                const requests = await NexusFriends.getSentRequests();
+                loading.style.display = 'none';
+
+                if (requests.length === 0) {
+                    container.innerHTML = '<div class="empty-state"><div class="empty-icon">📤</div><p>No sent friend requests</p></div>';
+                    return;
+                }
+
+                container.innerHTML = requests.map(request => {
+                    const initial = request.displayName.charAt(0).toUpperCase();
+                    return `
+            <div class="friend-card">
+              <div class="friend-header">
+                <div class="friend-avatar">${initial}</div>
+                <div class="friend-info">
+                  <div class="friend-name">${request.displayName}</div>
+                  <div class="friend-status">Level ${request.level} • ${request.xp} XP</div>
+                </div>
+              </div>
+              <div class="friend-actions">
+                <button class="btn btn-secondary" disabled>Pending</button>
+              </div>
+            </div>
+          `;
+                }).join('');
+            } catch (error) {
+                loading.style.display = 'none';
+                container.innerHTML = '<div class="empty-state"><div class="empty-icon">⚠️</div><p>Failed to load sent requests</p></div>';
+                console.error('Load sent requests error:', error);
+            }
+        }
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', async () => {
+            try {
+                const user = await NexusAuth.getUser();
+                if (!user) {
+                    window.location.href = '/login.html?returnTo=' + encodeURIComponent(window.location.href);
+                    return;
+                }
+
+                await loadFriends();
+                await loadPendingRequests();
+                await loadSentRequests();
+            } catch (error) {
+                console.error('Initialization error:', error);
+            }
+        });
+    </script>
+</body>
+
+</html>
