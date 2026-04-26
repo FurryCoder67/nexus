@@ -1,0 +1,668 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SPIRIT CHASE 3D — NEXUS</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            background: #000;
+            color: #fff;
+            font-family: 'Segoe UI', sans-serif;
+            overflow: hidden;
+            user-select: none;
+        }
+        #gameContainer {
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+        }
+        #ui {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            pointer-events: none;
+            z-index: 100;
+        }
+        #hud {
+            position: absolute;
+            top: 20px; left: 20px;
+            pointer-events: all;
+        }
+        .hud-panel {
+            background: rgba(0,0,0,0.8);
+            border: 1px solid #8b5cf6;
+            border-radius: 8px;
+            padding: 12px;
+            margin-bottom: 10px;
+            backdrop-filter: blur(10px);
+        }
+        #spirit-bar {
+            width: 200px;
+            height: 20px;
+            background: rgba(139, 92, 246, 0.3);
+            border-radius: 10px;
+            overflow: hidden;
+        }
+        #spirit-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #8b5cf6, #a78bfa);
+            width: 100%;
+            transition: width 0.3s ease;
+        }
+        #menu {
+            position: absolute;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0,0,0,0.9);
+            border: 2px solid #8b5cf6;
+            border-radius: 12px;
+            padding: 40px;
+            text-align: center;
+            pointer-events: all;
+        }
+        .menu-title {
+            font-size: 48px;
+            font-weight: 900;
+            color: #8b5cf6;
+            margin-bottom: 20px;
+            text-shadow: 0 0 20px #8b5cf6;
+        }
+        .menu-btn {
+            display: block;
+            width: 200px;
+            padding: 15px;
+            margin: 10px auto;
+            background: linear-gradient(135deg, #8b5cf6, #a78bfa);
+            border: none;
+            border-radius: 8px;
+            color: white;
+            font-size: 16px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        .menu-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(139, 92, 246, 0.5);
+        }
+        #game-info {
+            position: absolute;
+            top: 20px; right: 20px;
+            text-align: right;
+            font-size: 18px;
+            color: #8b5cf6;
+        }
+        #instructions {
+            position: absolute;
+            bottom: 20px; left: 20px;
+            color: #888;
+            font-size: 14px;
+            pointer-events: none;
+        }
+        .hidden { display: none !important; }
+    </style>
+</head>
+<body>
+    <div id="gameContainer"></div>
+    
+    <div id="ui">
+        <div id="hud" class="hidden">
+            <div class="hud-panel">
+                <div>Spirit Energy</div>
+                <div id="spirit-bar">
+                    <div id="spirit-fill"></div>
+                </div>
+            </div>
+            <div class="hud-panel">
+                <div>Speed: <span id="speed">Normal</span></div>
+                <div>Collected: <span id="collected">0</span></div>
+            </div>
+        </div>
+        
+        <div id="game-info" class="hidden">
+            <div>Time: <span id="time">0:00</span></div>
+            <div>Score: <span id="score">0</span></div>
+            <div>Spirits: <span id="spirits-left">10</span></div>
+        </div>
+        
+        <div id="instructions" class="hidden">
+            WASD: Move | Mouse: Look | Space: Phase Dash | Shift: Sprint | Collect all spirits to win!
+        </div>
+        
+        <div id="menu">
+            <div class="menu-title">SPIRIT CHASE 3D</div>
+            <button class="menu-btn" onclick="startGame()">CHASE SPIRITS</button>
+            <button class="menu-btn" onclick="showMultiplayer()">MULTIPLAYER</button>
+            <button class="menu-btn" onclick="showAbilities()">ABILITIES</button>
+            <button class="menu-btn" onclick="window.location.href='/'">BACK TO NEXUS</button>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/PointerLockControls.js"></script>
+    <script src="../nexus-3d-engine.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+    <script src="../nexus-config.js"></script>
+    <script src="../nexus-auth.js"></script>
+    <script src="../nexus-cloud.js"></script>
+    <script src="../nexus-db.js"></script>
+    
+    <script>
+        class SpiritChase3D {
+            constructor() {
+                this.engine = null;
+                this.player = null;
+                this.spirits = [];
+                this.obstacles = [];
+                this.maze = null;
+                
+                this.gameState = {
+                    spiritEnergy: 100,
+                    maxEnergy: 100,
+                    speed: 'Normal',
+                    collected: 0,
+                    totalSpirits: 15,
+                    score: 0,
+                    time: 0
+                };
+                
+                this.controls = null;
+                this.isPlaying = false;
+                this.startTime = 0;
+                this.lastDash = 0;
+                
+                this.movement = {
+                    forward: false,
+                    backward: false,
+                    left: false,
+                    right: false,
+                    sprint: false
+                };
+                
+                this.velocity = new THREE.Vector3();
+                this.direction = new THREE.Vector3();
+                
+                this.init();
+            }
+            
+            async init() {
+                this.engine = new Nexus3D('gameContainer', {
+                    shadows: true,
+                    fog: true,
+                    postProcessing: true,
+                    physics: false
+                });
+                
+                await new Promise(resolve => {
+                    const checkEngine = () => {
+                        if (this.engine.scene) {
+                            resolve();
+                        } else {
+                            setTimeout(checkEngine, 100);
+                        }
+                    };
+                    checkEngine();
+                });
+                
+                this.setupControls();
+                this.createMaze();
+                this.createPlayer();
+                this.spawnSpirits();
+                this.setupEventListeners();
+                
+                this.engine.onUpdate = (deltaTime) => this.update(deltaTime);
+            }
+            
+            setupControls() {
+                this.controls = new THREE.PointerLockControls(this.engine.camera, document.body);
+                this.engine.scene.add(this.controls.getObject());
+            }
+            
+            createMaze() {
+                // Create ethereal maze environment
+                const mazeSize = 40;
+                const wallHeight = 6;
+                
+                // Floor
+                const floorGeometry = new THREE.PlaneGeometry(mazeSize * 2, mazeSize * 2);
+                const floorMaterial = new THREE.MeshStandardMaterial({
+                    color: 0x1a0d3d,
+                    transparent: true,
+                    opacity: 0.8
+                });
+                
+                const floor = new THREE.Mesh(floorGeometry, floorMaterial);
+                floor.rotation.x = -Math.PI / 2;
+                floor.receiveShadow = true;
+                this.engine.scene.add(floor);
+                
+                // Create maze walls
+                this.createMazeWalls(mazeSize, wallHeight);
+                
+                // Add atmospheric elements
+                this.createAtmosphere();
+            }
+            
+            createMazeWalls(size, height) {
+                const wallMaterial = new THREE.MeshStandardMaterial({
+                    color: 0x4c1d95,
+                    transparent: true,
+                    opacity: 0.7,
+                    emissive: 0x1a0d3d
+                });
+                
+                // Simple maze pattern
+                const mazePattern = [
+                    [1,1,1,1,1,1,1,1,1,1],
+                    [1,0,0,0,1,0,0,0,0,1],
+                    [1,0,1,0,1,0,1,1,0,1],
+                    [1,0,1,0,0,0,0,1,0,1],
+                    [1,0,1,1,1,1,0,1,0,1],
+                    [1,0,0,0,0,0,0,1,0,1],
+                    [1,1,1,0,1,1,1,1,0,1],
+                    [1,0,0,0,0,0,0,0,0,1],
+                    [1,0,1,1,1,1,1,1,0,1],
+                    [1,1,1,1,1,1,1,1,1,1]
+                ];
+                
+                const cellSize = 4;
+                
+                for (let x = 0; x < mazePattern.length; x++) {
+                    for (let z = 0; z < mazePattern[x].length; z++) {
+                        if (mazePattern[x][z] === 1) {
+                            const wall = new THREE.Mesh(
+                                new THREE.BoxGeometry(cellSize, height, cellSize),
+                                wallMaterial
+                            );
+                            
+                            wall.position.set(
+                                (x - mazePattern.length / 2) * cellSize,
+                                height / 2,
+                                (z - mazePattern[x].length / 2) * cellSize
+                            );
+                            
+                            wall.castShadow = true;
+                            wall.receiveShadow = true;
+                            this.engine.scene.add(wall);
+                            this.obstacles.push(wall);
+                        }
+                    }
+                }
+            }
+            
+            createAtmosphere() {
+                // Add floating spirit particles
+                this.engine.createParticleSystem({
+                    count: 200,
+                    spread: 80,
+                    color: 0x8b5cf6,
+                    size: 0.3,
+                    opacity: 0.6
+                });
+                
+                // Add ethereal fog
+                this.engine.scene.fog = new THREE.Fog(0x0a0520, 10, 50);
+                
+                // Add mystical lighting
+                const mysticalLight = new THREE.PointLight(0x8b5cf6, 0.8, 30);
+                mysticalLight.position.set(0, 10, 0);
+                this.engine.scene.add(mysticalLight);
+                
+                // Add floating orbs for ambiance
+                for (let i = 0; i < 10; i++) {
+                    const orb = new THREE.Mesh(
+                        new THREE.SphereGeometry(0.3, 8, 8),
+                        new THREE.MeshBasicMaterial({
+                            color: 0xa78bfa,
+                            transparent: true,
+                            opacity: 0.4
+                        })
+                    );
+                    
+                    orb.position.set(
+                        (Math.random() - 0.5) * 60,
+                        Math.random() * 8 + 2,
+                        (Math.random() - 0.5) * 60
+                    );
+                    
+                    this.engine.scene.add(orb);
+                    
+                    // Animate orbs
+                    this.engine.animate(orb.position, 'y', orb.position.y + Math.random() * 2, 3000 + Math.random() * 2000);
+                }
+            }
+            
+            createPlayer() {
+                // Player is represented by the camera
+                this.controls.getObject().position.set(0, 1.8, 0);
+                
+                // Add player aura effect
+                const auraGeometry = new THREE.SphereGeometry(1.5, 16, 16);
+                const auraMaterial = new THREE.MeshBasicMaterial({
+                    color: 0x8b5cf6,
+                    transparent: true,
+                    opacity: 0.2,
+                    wireframe: true
+                });
+                
+                this.playerAura = new THREE.Mesh(auraGeometry, auraMaterial);
+                this.playerAura.position.set(0, 0, 0);
+                this.controls.getObject().add(this.playerAura);
+            }
+            
+            spawnSpirits() {
+                const spiritPositions = [
+                    new THREE.Vector3(-12, 2, -12),
+                    new THREE.Vector3(12, 2, -12),
+                    new THREE.Vector3(-12, 2, 12),
+                    new THREE.Vector3(12, 2, 12),
+                    new THREE.Vector3(0, 2, -16),
+                    new THREE.Vector3(0, 2, 16),
+                    new THREE.Vector3(-16, 2, 0),
+                    new THREE.Vector3(16, 2, 0),
+                    new THREE.Vector3(-8, 2, -8),
+                    new THREE.Vector3(8, 2, -8),
+                    new THREE.Vector3(-8, 2, 8),
+                    new THREE.Vector3(8, 2, 8),
+                    new THREE.Vector3(0, 2, 0),
+                    new THREE.Vector3(-4, 2, 4),
+                    new THREE.Vector3(4, 2, -4)
+                ];
+                
+                spiritPositions.forEach((position, index) => {
+                    const spirit = new THREE.Mesh(
+                        new THREE.SphereGeometry(0.5, 12, 12),
+                        new THREE.MeshBasicMaterial({
+                            color: 0xffffff,
+                            transparent: true,
+                            opacity: 0.8
+                        })
+                    );
+                    
+                    spirit.position.copy(position);
+                    spirit.userData = { collected: false, id: index };
+                    
+                    // Add glow effect
+                    const glowGeometry = new THREE.SphereGeometry(0.8, 8, 8);
+                    const glowMaterial = new THREE.MeshBasicMaterial({
+                        color: 0x8b5cf6,
+                        transparent: true,
+                        opacity: 0.3
+                    });
+                    
+                    const glow = new THREE.Mesh(glowGeometry, glowMaterial);
+                    spirit.add(glow);
+                    
+                    this.engine.scene.add(spirit);
+                    this.spirits.push(spirit);
+                    
+                    // Animate spirits
+                    this.engine.animate(spirit.position, 'y', position.y + 0.5, 2000 + Math.random() * 1000);
+                    this.engine.animate(spirit.rotation, 'y', Math.PI * 2, 3000);
+                });
+            }
+            
+            setupEventListeners() {
+                document.addEventListener('keydown', (e) => {
+                    switch (e.code) {
+                        case 'KeyW': this.movement.forward = true; break;
+                        case 'KeyS': this.movement.backward = true; break;
+                        case 'KeyA': this.movement.left = true; break;
+                        case 'KeyD': this.movement.right = true; break;
+                        case 'ShiftLeft': this.movement.sprint = true; break;
+                        case 'Space':
+                            e.preventDefault();
+                            this.phaseDash();
+                            break;
+                    }
+                });
+                
+                document.addEventListener('keyup', (e) => {
+                    switch (e.code) {
+                        case 'KeyW': this.movement.forward = false; break;
+                        case 'KeyS': this.movement.backward = false; break;
+                        case 'KeyA': this.movement.left = false; break;
+                        case 'KeyD': this.movement.right = false; break;
+                        case 'ShiftLeft': this.movement.sprint = false; break;
+                    }
+                });
+                
+                document.addEventListener('click', () => {
+                    if (this.isPlaying && !document.pointerLockElement) {
+                        this.controls.lock();
+                    }
+                });
+            }
+            
+            phaseDash() {
+                const now = Date.now();
+                if (now - this.lastDash < 2000 || this.gameState.spiritEnergy < 20) return;
+                
+                this.lastDash = now;
+                this.gameState.spiritEnergy -= 20;
+                
+                // Dash forward
+                const dashDirection = new THREE.Vector3();
+                this.engine.camera.getWorldDirection(dashDirection);
+                dashDirection.multiplyScalar(10);
+                
+                this.controls.getObject().position.add(dashDirection);
+                
+                // Visual effect
+                this.playerAura.material.opacity = 0.8;
+                setTimeout(() => {
+                    this.playerAura.material.opacity = 0.2;
+                }, 500);
+                
+                this.updateHUD();
+            }
+            
+            update(deltaTime) {
+                if (!this.isPlaying) return;
+                
+                this.updateMovement(deltaTime);
+                this.updateSpirits(deltaTime);
+                this.checkSpiritCollection();
+                this.regenerateEnergy(deltaTime);
+                this.updateTimer();
+                this.checkWinCondition();
+            }
+            
+            updateMovement(deltaTime) {
+                const baseSpeed = 8;
+                const sprintMultiplier = this.movement.sprint ? 1.5 : 1;
+                const speed = baseSpeed * sprintMultiplier;
+                
+                this.velocity.x -= this.velocity.x * 10.0 * deltaTime;
+                this.velocity.z -= this.velocity.z * 10.0 * deltaTime;
+                
+                this.direction.z = Number(this.movement.forward) - Number(this.movement.backward);
+                this.direction.x = Number(this.movement.right) - Number(this.movement.left);
+                this.direction.normalize();
+                
+                if (this.movement.forward || this.movement.backward) {
+                    this.velocity.z -= this.direction.z * speed * deltaTime;
+                }
+                if (this.movement.left || this.movement.right) {
+                    this.velocity.x -= this.direction.x * speed * deltaTime;
+                }
+                
+                // Apply movement
+                this.controls.moveRight(-this.velocity.x * deltaTime);
+                this.controls.moveForward(-this.velocity.z * deltaTime);
+                
+                // Update speed display
+                const currentSpeed = this.movement.sprint ? 'Fast' : 'Normal';
+                if (this.gameState.speed !== currentSpeed) {
+                    this.gameState.speed = currentSpeed;
+                    this.updateHUD();
+                }
+            }
+            
+            updateSpirits(deltaTime) {
+                this.spirits.forEach(spirit => {
+                    if (spirit.userData.collected) return;
+                    
+                    // Rotate spirits
+                    spirit.rotation.y += deltaTime * 2;
+                    
+                    // Bob up and down
+                    spirit.position.y += Math.sin(Date.now() * 0.003 + spirit.userData.id) * 0.01;
+                    
+                    // Pulse glow
+                    const glow = spirit.children[0];
+                    if (glow) {
+                        glow.material.opacity = 0.2 + Math.sin(Date.now() * 0.005 + spirit.userData.id) * 0.1;
+                    }
+                });
+            }
+            
+            checkSpiritCollection() {
+                const playerPosition = this.controls.getObject().position;
+                
+                this.spirits.forEach(spirit => {
+                    if (spirit.userData.collected) return;
+                    
+                    const distance = playerPosition.distanceTo(spirit.position);
+                    if (distance < 2) {
+                        this.collectSpirit(spirit);
+                    }
+                });
+            }
+            
+            collectSpirit(spirit) {
+                spirit.userData.collected = true;
+                this.gameState.collected++;
+                this.gameState.score += 100;
+                this.gameState.spiritEnergy = Math.min(this.gameState.spiritEnergy + 10, this.gameState.maxEnergy);
+                
+                // Collection effect
+                const collectEffect = new THREE.Mesh(
+                    new THREE.SphereGeometry(1, 8, 8),
+                    new THREE.MeshBasicMaterial({
+                        color: 0xffffff,
+                        transparent: true,
+                        opacity: 0.8
+                    })
+                );
+                collectEffect.position.copy(spirit.position);
+                this.engine.scene.add(collectEffect);
+                
+                // Animate collection
+                this.engine.animate(collectEffect.scale, 'x', 2, 500);
+                this.engine.animate(collectEffect.scale, 'y', 2, 500);
+                this.engine.animate(collectEffect.scale, 'z', 2, 500);
+                this.engine.animate(collectEffect.material, 'opacity', 0, 500);
+                
+                setTimeout(() => {
+                    this.engine.scene.remove(collectEffect);
+                }, 500);
+                
+                // Remove spirit
+                this.engine.scene.remove(spirit);
+                
+                this.updateHUD();
+            }
+            
+            regenerateEnergy(deltaTime) {
+                if (this.gameState.spiritEnergy < this.gameState.maxEnergy) {
+                    this.gameState.spiritEnergy += 15 * deltaTime;
+                    this.gameState.spiritEnergy = Math.min(this.gameState.spiritEnergy, this.gameState.maxEnergy);
+                    this.updateHUD();
+                }
+            }
+            
+            updateTimer() {
+                if (!this.isPlaying) return;
+                
+                const elapsed = Math.floor((Date.now() - this.startTime) / 1000);
+                const minutes = Math.floor(elapsed / 60);
+                const seconds = elapsed % 60;
+                
+                this.gameState.time = elapsed;
+                document.getElementById('time').textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+            }
+            
+            checkWinCondition() {
+                if (this.gameState.collected >= this.gameState.totalSpirits) {
+                    this.gameWin();
+                }
+            }
+            
+            updateHUD() {
+                document.getElementById('spirit-fill').style.width = (this.gameState.spiritEnergy / this.gameState.maxEnergy * 100) + '%';
+                document.getElementById('speed').textContent = this.gameState.speed;
+                document.getElementById('collected').textContent = this.gameState.collected;
+                document.getElementById('score').textContent = this.gameState.score;
+                document.getElementById('spirits-left').textContent = this.gameState.totalSpirits - this.gameState.collected;
+            }
+            
+            gameWin() {
+                this.isPlaying = false;
+                this.controls.unlock();
+                
+                // Bonus points for time
+                const timeBonus = Math.max(0, 300 - this.gameState.time) * 10;
+                this.gameState.score += timeBonus;
+                
+                this.saveGameStats();
+                
+                document.getElementById('menu').classList.remove('hidden');
+                document.getElementById('hud').classList.add('hidden');
+                document.getElementById('game-info').classList.add('hidden');
+                document.getElementById('instructions').classList.add('hidden');
+                
+                document.querySelector('.menu-title').textContent = 'SPIRITS COLLECTED!';
+                document.querySelector('.menu-btn').textContent = 'CHASE AGAIN';
+            }
+            
+            async saveGameStats() {
+                try {
+                    const stats = {
+                        score: this.gameState.score,
+                        won: this.gameState.collected >= this.gameState.totalSpirits,
+                        playtime_seconds: this.gameState.time,
+                        extra: {
+                            spirits_collected: this.gameState.collected,
+                            completion_time: this.gameState.time,
+                            phase_dashes_used: Math.floor((Date.now() - this.startTime) / 2000)
+                        }
+                    };
+                    
+                    if (window.NexusDB) {
+                        await NexusDB.saveStats('spirit-chase', stats);
+                    }
+                } catch (error) {
+                    console.error('Failed to save stats:', error);
+                }
+            }
+        }
+        
+        let game = null;
+        
+        async function startGame() {
+            document.getElementById('menu').classList.add('hidden');
+            document.getElementById('hud').classList.remove('hidden');
+            document.getElementById('game-info').classList.remove('hidden');
+            document.getElementById('instructions').classList.remove('hidden');
+            
+            if (!game) {
+                game = new SpiritChase3D();
+            }
+            
+            game.isPlaying = true;
+            game.startTime = Date.now();
+            game.controls.lock();
+        }
+        
+        function showMultiplayer() {
+            window.location.href = '/multiplayer-lobby.html?game=spirit-chase';
+        }
+        
+        function showAbilities() {
+            alert('Spirit Abilities:\nSpace - Phase Dash (costs energy)\nShift - Sprint (faster movement)\nCollect spirits to restore energy!');
+        }
+    </script>
+</body>
+</html>

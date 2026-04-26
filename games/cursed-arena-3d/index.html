@@ -1,0 +1,748 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CURSED ARENA 3D — NEXUS</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            background: #000;
+            color: #fff;
+            font-family: 'Segoe UI', sans-serif;
+            overflow: hidden;
+            user-select: none;
+        }
+        #gameContainer {
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+        }
+        #ui {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            pointer-events: none;
+            z-index: 100;
+        }
+        #hud {
+            position: absolute;
+            top: 20px; left: 20px;
+            pointer-events: all;
+        }
+        .hud-panel {
+            background: rgba(0,0,0,0.8);
+            border: 1px solid #06b6d4;
+            border-radius: 8px;
+            padding: 12px;
+            margin-bottom: 10px;
+            backdrop-filter: blur(10px);
+        }
+        #energy-bar {
+            width: 200px;
+            height: 20px;
+            background: rgba(6, 182, 212, 0.3);
+            border-radius: 10px;
+            overflow: hidden;
+        }
+        #energy-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #06b6d4, #0891b2);
+            width: 100%;
+            transition: width 0.3s ease;
+        }
+        #menu {
+            position: absolute;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0,0,0,0.9);
+            border: 2px solid #06b6d4;
+            border-radius: 12px;
+            padding: 40px;
+            text-align: center;
+            pointer-events: all;
+        }
+        .menu-title {
+            font-size: 48px;
+            font-weight: 900;
+            color: #06b6d4;
+            margin-bottom: 20px;
+            text-shadow: 0 0 20px #06b6d4;
+        }
+        .menu-btn {
+            display: block;
+            width: 200px;
+            padding: 15px;
+            margin: 10px auto;
+            background: linear-gradient(135deg, #06b6d4, #0891b2);
+            border: none;
+            border-radius: 8px;
+            color: white;
+            font-size: 16px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        .menu-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(6, 182, 212, 0.5);
+        }
+        #wave-info {
+            position: absolute;
+            top: 20px; right: 20px;
+            text-align: right;
+            font-size: 18px;
+            color: #06b6d4;
+        }
+        #minimap {
+            position: absolute;
+            bottom: 20px; right: 20px;
+            width: 150px;
+            height: 150px;
+            background: rgba(0,0,0,0.8);
+            border: 2px solid #06b6d4;
+            border-radius: 8px;
+        }
+        .hidden { display: none !important; }
+    </style>
+</head>
+<body>
+    <div id="gameContainer"></div>
+    
+    <div id="ui">
+        <div id="hud" class="hidden">
+            <div class="hud-panel">
+                <div>Cursed Energy</div>
+                <div id="energy-bar">
+                    <div id="energy-fill"></div>
+                </div>
+            </div>
+            <div class="hud-panel">
+                <div>Technique: <span id="current-technique">Void Manipulation</span></div>
+                <div>Combo: <span id="combo">0x</span></div>
+            </div>
+        </div>
+        
+        <div id="wave-info" class="hidden">
+            <div>Wave: <span id="wave-number">1</span></div>
+            <div>Enemies: <span id="enemies-left">5</span></div>
+            <div>Score: <span id="score">0</span></div>
+        </div>
+        
+        <div id="minimap" class="hidden"></div>
+        
+        <div id="menu">
+            <div class="menu-title">CURSED ARENA 3D</div>
+            <button class="menu-btn" onclick="startGame()">ENTER ARENA</button>
+            <button class="menu-btn" onclick="showMultiplayer()">MULTIPLAYER</button>
+            <button class="menu-btn" onclick="showTechniques()">TECHNIQUES</button>
+            <button class="menu-btn" onclick="window.location.href='/'">BACK TO NEXUS</button>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="../nexus-3d-engine.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+    <script src="../nexus-config.js"></script>
+    <script src="../nexus-auth.js"></script>
+    <script src="../nexus-cloud.js"></script>
+    <script src="../nexus-db.js"></script>
+    
+    <script>
+        class CursedArena3D {
+            constructor() {
+                this.engine = null;
+                this.player = null;
+                this.enemies = [];
+                this.projectiles = [];
+                this.powerups = [];
+                this.arena = null;
+                
+                this.gameState = {
+                    energy: 100,
+                    maxEnergy: 100,
+                    wave: 1,
+                    score: 0,
+                    combo: 0,
+                    technique: 'Void Manipulation',
+                    enemiesInWave: 5,
+                    enemiesLeft: 5
+                };
+                
+                this.isPlaying = false;
+                this.startTime = 0;
+                this.waveStartTime = 0;
+                
+                this.techniques = {
+                    'Void Manipulation': { cost: 20, damage: 100, range: 15 },
+                    'Shadow Clone': { cost: 30, damage: 50, range: 10 },
+                    'Cursed Blast': { cost: 15, damage: 75, range: 20 },
+                    'Time Dilation': { cost: 40, damage: 0, range: 25 }
+                };
+                
+                this.init();
+            }
+            
+            async init() {
+                this.engine = new Nexus3D('gameContainer', {
+                    shadows: true,
+                    fog: true,
+                    postProcessing: true,
+                    physics: true
+                });
+                
+                await new Promise(resolve => {
+                    const checkEngine = () => {
+                        if (this.engine.scene) {
+                            resolve();
+                        } else {
+                            setTimeout(checkEngine, 100);
+                        }
+                    };
+                    checkEngine();
+                });
+                
+                this.createArena();
+                this.createPlayer();
+                this.setupControls();
+                this.setupEventListeners();
+                
+                this.engine.onUpdate = (deltaTime) => this.update(deltaTime);
+            }
+            
+            createArena() {
+                // Create circular arena
+                const arenaRadius = 30;
+                const arenaGeometry = new THREE.CylinderGeometry(arenaRadius, arenaRadius, 1, 32);
+                const arenaMaterial = new THREE.MeshStandardMaterial({
+                    color: 0x1a1a2e,
+                    roughness: 0.8,
+                    metalness: 0.2
+                });
+                
+                this.arena = new THREE.Mesh(arenaGeometry, arenaMaterial);
+                this.arena.receiveShadow = true;
+                this.engine.scene.add(this.arena);
+                
+                // Create arena walls
+                const wallHeight = 8;
+                const wallGeometry = new THREE.CylinderGeometry(arenaRadius + 1, arenaRadius + 1, wallHeight, 32, 1, true);
+                const wallMaterial = new THREE.MeshStandardMaterial({
+                    color: 0x2d1b69,
+                    transparent: true,
+                    opacity: 0.7,
+                    side: THREE.DoubleSide
+                });
+                
+                const walls = new THREE.Mesh(wallGeometry, wallMaterial);
+                walls.position.y = wallHeight / 2;
+                this.engine.scene.add(walls);
+                
+                // Add cursed energy pillars
+                this.createEnergyPillars();
+                
+                // Add floating platforms
+                this.createFloatingPlatforms();
+            }
+            
+            createEnergyPillars() {
+                const pillarCount = 8;
+                const arenaRadius = 25;
+                
+                for (let i = 0; i < pillarCount; i++) {
+                    const angle = (i / pillarCount) * Math.PI * 2;
+                    const x = Math.cos(angle) * arenaRadius;
+                    const z = Math.sin(angle) * arenaRadius;
+                    
+                    const pillar = new THREE.Mesh(
+                        new THREE.CylinderGeometry(0.5, 0.8, 6, 8),
+                        new THREE.MeshStandardMaterial({
+                            color: 0x06b6d4,
+                            emissive: 0x033d4a,
+                            transparent: true,
+                            opacity: 0.8
+                        })
+                    );
+                    
+                    pillar.position.set(x, 3, z);
+                    pillar.castShadow = true;
+                    this.engine.scene.add(pillar);
+                    
+                    // Add energy effect
+                    const energyOrb = new THREE.Mesh(
+                        new THREE.SphereGeometry(0.3, 8, 8),
+                        new THREE.MeshBasicMaterial({
+                            color: 0x06b6d4,
+                            transparent: true,
+                            opacity: 0.6
+                        })
+                    );
+                    energyOrb.position.set(x, 6.5, z);
+                    this.engine.scene.add(energyOrb);
+                    
+                    // Animate energy orb
+                    this.engine.animate(energyOrb.position, 'y', 7.5, 2000);
+                }
+            }
+            
+            createFloatingPlatforms() {
+                const platformCount = 6;
+                const platformRadius = 15;
+                
+                for (let i = 0; i < platformCount; i++) {
+                    const angle = (i / platformCount) * Math.PI * 2;
+                    const x = Math.cos(angle) * platformRadius;
+                    const z = Math.sin(angle) * platformRadius;
+                    
+                    const platform = new THREE.Mesh(
+                        new THREE.CylinderGeometry(2, 2, 0.3, 8),
+                        new THREE.MeshStandardMaterial({
+                            color: 0x4c1d95,
+                            roughness: 0.6,
+                            metalness: 0.4
+                        })
+                    );
+                    
+                    platform.position.set(x, 2 + Math.random() * 2, z);
+                    platform.castShadow = true;
+                    platform.receiveShadow = true;
+                    this.engine.scene.add(platform);
+                }
+            }
+            
+            createPlayer() {
+                // Player representation
+                const playerGeometry = new THREE.CapsuleGeometry(0.5, 1.5, 4, 8);
+                const playerMaterial = new THREE.MeshStandardMaterial({
+                    color: 0x7c3aed,
+                    emissive: 0x1a0d3d
+                });
+                
+                this.player = new THREE.Mesh(playerGeometry, playerMaterial);
+                this.player.position.set(0, 1, 0);
+                this.player.castShadow = true;
+                this.engine.scene.add(this.player);
+                
+                // Set camera to follow player
+                this.engine.camera.position.set(0, 15, 15);
+                this.engine.camera.lookAt(0, 0, 0);
+                
+                // Add physics body
+                if (this.engine.physics) {
+                    this.playerBody = this.engine.physics.addBody(this.player, 1, 'dynamic');
+                }
+            }
+            
+            spawnEnemy() {
+                const angle = Math.random() * Math.PI * 2;
+                const distance = 20 + Math.random() * 8;
+                const x = Math.cos(angle) * distance;
+                const z = Math.sin(angle) * distance;
+                
+                // Random enemy type
+                const enemyTypes = [
+                    { color: 0xff4444, size: 1, health: 100, speed: 2 },
+                    { color: 0x44ff44, size: 0.7, health: 50, speed: 4 },
+                    { color: 0x4444ff, size: 1.5, health: 200, speed: 1 }
+                ];
+                
+                const type = enemyTypes[Math.floor(Math.random() * enemyTypes.length)];
+                
+                const enemy = new THREE.Mesh(
+                    new THREE.OctahedronGeometry(type.size),
+                    new THREE.MeshStandardMaterial({
+                        color: type.color,
+                        emissive: new THREE.Color(type.color).multiplyScalar(0.2)
+                    })
+                );
+                
+                enemy.position.set(x, type.size, z);
+                enemy.health = type.health;
+                enemy.maxHealth = type.health;
+                enemy.speed = type.speed;
+                enemy.lastAttack = 0;
+                enemy.castShadow = true;
+                
+                this.engine.scene.add(enemy);
+                this.enemies.push(enemy);
+                
+                // Add floating animation
+                this.engine.animate(enemy.position, 'y', enemy.position.y + 0.5, 1000 + Math.random() * 1000);
+            }
+            
+            useTechnique(techniqueName) {
+                const technique = this.techniques[techniqueName];
+                if (!technique || this.gameState.energy < technique.cost) return;
+                
+                this.gameState.energy -= technique.cost;
+                this.updateHUD();
+                
+                switch (techniqueName) {
+                    case 'Void Manipulation':
+                        this.voidManipulation();
+                        break;
+                    case 'Shadow Clone':
+                        this.shadowClone();
+                        break;
+                    case 'Cursed Blast':
+                        this.cursedBlast();
+                        break;
+                    case 'Time Dilation':
+                        this.timeDilation();
+                        break;
+                }
+            }
+            
+            voidManipulation() {
+                // Create void sphere
+                const voidSphere = new THREE.Mesh(
+                    new THREE.SphereGeometry(5, 16, 16),
+                    new THREE.MeshBasicMaterial({
+                        color: 0x000000,
+                        transparent: true,
+                        opacity: 0.8,
+                        side: THREE.BackSide
+                    })
+                );
+                
+                voidSphere.position.copy(this.player.position);
+                this.engine.scene.add(voidSphere);
+                
+                // Damage enemies in range
+                this.enemies.forEach(enemy => {
+                    const distance = enemy.position.distanceTo(this.player.position);
+                    if (distance < 15) {
+                        enemy.health -= 100;
+                        this.addScore(50);
+                    }
+                });
+                
+                // Remove void after effect
+                setTimeout(() => {
+                    this.engine.scene.remove(voidSphere);
+                }, 1500);
+            }
+            
+            shadowClone() {
+                // Create shadow clones around player
+                for (let i = 0; i < 3; i++) {
+                    const angle = (i / 3) * Math.PI * 2;
+                    const clone = this.player.clone();
+                    clone.material = new THREE.MeshStandardMaterial({
+                        color: 0x333333,
+                        transparent: true,
+                        opacity: 0.7
+                    });
+                    
+                    clone.position.set(
+                        this.player.position.x + Math.cos(angle) * 3,
+                        this.player.position.y,
+                        this.player.position.z + Math.sin(angle) * 3
+                    );
+                    
+                    this.engine.scene.add(clone);
+                    
+                    // Remove clone after duration
+                    setTimeout(() => {
+                        this.engine.scene.remove(clone);
+                    }, 3000);
+                }
+            }
+            
+            cursedBlast() {
+                // Create projectile
+                const blast = new THREE.Mesh(
+                    new THREE.SphereGeometry(0.5, 8, 8),
+                    new THREE.MeshBasicMaterial({
+                        color: 0x7c3aed,
+                        transparent: true,
+                        opacity: 0.8
+                    })
+                );
+                
+                blast.position.copy(this.player.position);
+                blast.position.y += 1;
+                
+                // Find nearest enemy for targeting
+                let nearestEnemy = null;
+                let nearestDistance = Infinity;
+                
+                this.enemies.forEach(enemy => {
+                    const distance = enemy.position.distanceTo(this.player.position);
+                    if (distance < nearestDistance) {
+                        nearestDistance = distance;
+                        nearestEnemy = enemy;
+                    }
+                });
+                
+                if (nearestEnemy) {
+                    const direction = new THREE.Vector3()
+                        .subVectors(nearestEnemy.position, blast.position)
+                        .normalize();
+                    
+                    blast.velocity = direction.multiplyScalar(20);
+                    blast.damage = 75;
+                    blast.life = 3;
+                    
+                    this.engine.scene.add(blast);
+                    this.projectiles.push(blast);
+                }
+            }
+            
+            timeDilation() {
+                // Slow down all enemies
+                this.enemies.forEach(enemy => {
+                    enemy.originalSpeed = enemy.speed;
+                    enemy.speed *= 0.2;
+                    
+                    // Visual effect
+                    enemy.material.emissive = new THREE.Color(0x0066ff);
+                });
+                
+                // Restore speed after duration
+                setTimeout(() => {
+                    this.enemies.forEach(enemy => {
+                        if (enemy.originalSpeed) {
+                            enemy.speed = enemy.originalSpeed;
+                            enemy.material.emissive = new THREE.Color(0x000000);
+                        }
+                    });
+                }, 5000);
+            }
+            
+            setupControls() {
+                this.movement = {
+                    forward: false,
+                    backward: false,
+                    left: false,
+                    right: false
+                };
+            }
+            
+            setupEventListeners() {
+                document.addEventListener('keydown', (e) => {
+                    switch (e.code) {
+                        case 'KeyW': this.movement.forward = true; break;
+                        case 'KeyS': this.movement.backward = true; break;
+                        case 'KeyA': this.movement.left = true; break;
+                        case 'KeyD': this.movement.right = true; break;
+                        case 'Digit1': this.useTechnique('Void Manipulation'); break;
+                        case 'Digit2': this.useTechnique('Shadow Clone'); break;
+                        case 'Digit3': this.useTechnique('Cursed Blast'); break;
+                        case 'Digit4': this.useTechnique('Time Dilation'); break;
+                    }
+                });
+                
+                document.addEventListener('keyup', (e) => {
+                    switch (e.code) {
+                        case 'KeyW': this.movement.forward = false; break;
+                        case 'KeyS': this.movement.backward = false; break;
+                        case 'KeyA': this.movement.left = false; break;
+                        case 'KeyD': this.movement.right = false; break;
+                    }
+                });
+            }
+            
+            update(deltaTime) {
+                if (!this.isPlaying) return;
+                
+                this.updatePlayer(deltaTime);
+                this.updateEnemies(deltaTime);
+                this.updateProjectiles(deltaTime);
+                this.checkCollisions();
+                this.regenerateEnergy(deltaTime);
+                this.checkWaveComplete();
+            }
+            
+            updatePlayer(deltaTime) {
+                const speed = 8;
+                const direction = new THREE.Vector3();
+                
+                if (this.movement.forward) direction.z -= 1;
+                if (this.movement.backward) direction.z += 1;
+                if (this.movement.left) direction.x -= 1;
+                if (this.movement.right) direction.x += 1;
+                
+                direction.normalize().multiplyScalar(speed * deltaTime);
+                this.player.position.add(direction);
+                
+                // Keep player in arena bounds
+                const distance = Math.sqrt(this.player.position.x ** 2 + this.player.position.z ** 2);
+                if (distance > 28) {
+                    this.player.position.normalize().multiplyScalar(28);
+                    this.player.position.y = 1;
+                }
+                
+                // Rotate player based on movement
+                if (direction.length() > 0) {
+                    this.player.rotation.y = Math.atan2(direction.x, direction.z);
+                }
+            }
+            
+            updateEnemies(deltaTime) {
+                this.enemies.forEach((enemy, index) => {
+                    if (enemy.health <= 0) {
+                        this.engine.scene.remove(enemy);
+                        this.enemies.splice(index, 1);
+                        this.gameState.enemiesLeft--;
+                        this.addScore(100);
+                        this.updateHUD();
+                        return;
+                    }
+                    
+                    // Move towards player
+                    const direction = new THREE.Vector3()
+                        .subVectors(this.player.position, enemy.position)
+                        .normalize();
+                    
+                    enemy.position.add(direction.multiplyScalar(enemy.speed * deltaTime));
+                    
+                    // Look at player
+                    enemy.lookAt(this.player.position);
+                    
+                    // Attack player if close
+                    const distance = enemy.position.distanceTo(this.player.position);
+                    if (distance < 2 && Date.now() - enemy.lastAttack > 1000) {
+                        enemy.lastAttack = Date.now();
+                        this.gameState.energy -= 10;
+                        this.updateHUD();
+                    }
+                });
+            }
+            
+            updateProjectiles(deltaTime) {
+                this.projectiles.forEach((projectile, index) => {
+                    projectile.position.add(projectile.velocity.clone().multiplyScalar(deltaTime));
+                    projectile.life -= deltaTime;
+                    
+                    if (projectile.life <= 0) {
+                        this.engine.scene.remove(projectile);
+                        this.projectiles.splice(index, 1);
+                    }
+                });
+            }
+            
+            checkCollisions() {
+                // Projectile-enemy collisions
+                this.projectiles.forEach((projectile, pIndex) => {
+                    this.enemies.forEach((enemy, eIndex) => {
+                        const distance = projectile.position.distanceTo(enemy.position);
+                        if (distance < 1.5) {
+                            enemy.health -= projectile.damage;
+                            this.engine.scene.remove(projectile);
+                            this.projectiles.splice(pIndex, 1);
+                            
+                            // Hit effect
+                            const explosion = new THREE.Mesh(
+                                new THREE.SphereGeometry(2, 8, 8),
+                                new THREE.MeshBasicMaterial({
+                                    color: 0xff0000,
+                                    transparent: true,
+                                    opacity: 0.6
+                                })
+                            );
+                            explosion.position.copy(enemy.position);
+                            this.engine.scene.add(explosion);
+                            
+                            setTimeout(() => {
+                                this.engine.scene.remove(explosion);
+                            }, 300);
+                        }
+                    });
+                });
+            }
+            
+            regenerateEnergy(deltaTime) {
+                if (this.gameState.energy < this.gameState.maxEnergy) {
+                    this.gameState.energy += 20 * deltaTime;
+                    this.gameState.energy = Math.min(this.gameState.energy, this.gameState.maxEnergy);
+                    this.updateHUD();
+                }
+            }
+            
+            checkWaveComplete() {
+                if (this.gameState.enemiesLeft <= 0) {
+                    this.nextWave();
+                }
+            }
+            
+            nextWave() {
+                this.gameState.wave++;
+                this.gameState.enemiesInWave = Math.min(5 + this.gameState.wave, 15);
+                this.gameState.enemiesLeft = this.gameState.enemiesInWave;
+                
+                // Spawn new wave
+                for (let i = 0; i < this.gameState.enemiesInWave; i++) {
+                    setTimeout(() => this.spawnEnemy(), i * 500);
+                }
+                
+                this.updateHUD();
+            }
+            
+            addScore(points) {
+                this.gameState.score += points;
+                this.gameState.combo++;
+                this.updateHUD();
+            }
+            
+            updateHUD() {
+                document.getElementById('energy-fill').style.width = (this.gameState.energy / this.gameState.maxEnergy * 100) + '%';
+                document.getElementById('wave-number').textContent = this.gameState.wave;
+                document.getElementById('enemies-left').textContent = this.gameState.enemiesLeft;
+                document.getElementById('score').textContent = this.gameState.score;
+                document.getElementById('combo').textContent = this.gameState.combo + 'x';
+            }
+            
+            async saveGameStats() {
+                try {
+                    const playtime = Math.floor((Date.now() - this.startTime) / 1000);
+                    const stats = {
+                        score: this.gameState.score,
+                        won: this.gameState.wave >= 10,
+                        playtime_seconds: playtime,
+                        extra: {
+                            waves_completed: this.gameState.wave - 1,
+                            max_combo: this.gameState.combo,
+                            technique_used: this.gameState.technique
+                        }
+                    };
+                    
+                    if (window.NexusDB) {
+                        await NexusDB.saveStats('cursed-arena', stats);
+                    }
+                } catch (error) {
+                    console.error('Failed to save stats:', error);
+                }
+            }
+        }
+        
+        let game = null;
+        
+        async function startGame() {
+            document.getElementById('menu').classList.add('hidden');
+            document.getElementById('hud').classList.remove('hidden');
+            document.getElementById('wave-info').classList.remove('hidden');
+            document.getElementById('minimap').classList.remove('hidden');
+            
+            if (!game) {
+                game = new CursedArena3D();
+            }
+            
+            game.isPlaying = true;
+            game.startTime = Date.now();
+            
+            // Start first wave
+            for (let i = 0; i < game.gameState.enemiesInWave; i++) {
+                setTimeout(() => game.spawnEnemy(), i * 1000);
+            }
+        }
+        
+        function showMultiplayer() {
+            window.location.href = '/multiplayer-lobby.html?game=cursed-arena';
+        }
+        
+        function showTechniques() {
+            alert('Techniques:\n1 - Void Manipulation\n2 - Shadow Clone\n3 - Cursed Blast\n4 - Time Dilation');
+        }
+    </script>
+</body>
+</html>

@@ -1,11 +1,16 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>SorcererOne — NEXUS Profile</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>NEXUS — Profile</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <script src="games/nexus-config.js"></script>
+  <script src="games/nexus-auth.js"></script>
+  <script src="games/nexus-db.js"></script>
   <style>
-    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
     :root {
       --bg: #06040f;
       --card: #0f0b1a;
@@ -14,867 +19,611 @@
       --accent2: #06b6d4;
       --text: #f1f5f9;
       --muted: #64748b;
-      --border: rgba(124,58,237,0.2);
+      --border: rgba(124, 58, 237, 0.2);
       --success: #22c55e;
       --gold: #f59e0b;
-      --red: #ef4444;
-      --nav-h: 56px;
     }
-    html { scroll-behavior: smooth; }
-    body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', system-ui, sans-serif; overflow-x: hidden; min-height: 100vh; }
-    ::-webkit-scrollbar { width: 6px; }
-    ::-webkit-scrollbar-track { background: var(--bg); }
-    ::-webkit-scrollbar-thumb { background: var(--accent); border-radius: 3px; }
 
-    /* NAV */
-    .nav {
-      position: fixed; top: 0; left: 0; right: 0; height: var(--nav-h);
-      background: rgba(6,4,15,0.92); backdrop-filter: blur(16px);
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      min-height: 100vh;
+      padding: 20px;
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    .header {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      margin-bottom: 32px;
+      padding-bottom: 20px;
       border-bottom: 1px solid var(--border);
-      display: flex; align-items: center; padding: 0 18px; gap: 14px; z-index: 1000;
     }
-    .nav-logo { display: flex; align-items: center; gap: 9px; text-decoration: none; flex-shrink: 0; }
-    .nav-logo-icon { width:34px;height:34px;background:linear-gradient(135deg,var(--accent),#9d5cf6);border-radius:8px;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:18px;color:#fff;box-shadow:0 0 18px rgba(124,58,237,0.6); }
-    .nav-logo-text { font-size:17px;font-weight:800;color:var(--text);letter-spacing:2px;text-transform:uppercase; }
-    .nav-links { flex:1;display:flex;gap:4px;justify-content:center; }
-    .nav-link { padding:7px 14px;border-radius:6px;font-size:13px;font-weight:600;color:var(--muted);text-decoration:none;transition:background 0.15s,color 0.15s; }
-    .nav-link:hover { background:rgba(124,58,237,0.1);color:var(--text); }
-    .nav-link.active { background:rgba(124,58,237,0.18);color:var(--text); }
-    .nav-right { display:flex;align-items:center;gap:10px;margin-left:auto;flex-shrink:0; }
-    .nav-coins { display:flex;align-items:center;gap:6px;background:rgba(245,158,11,0.1);border:1px solid rgba(245,158,11,0.25);border-radius:6px;padding:5px 10px;cursor:pointer; }
-    .coin-hex { width:16px;height:16px;background:var(--gold);clip-path:polygon(50% 0%,100% 25%,100% 75%,50% 100%,0% 75%,0% 25%); }
-    .nav-coins span { font-size:13px;font-weight:700;color:var(--gold); }
-    .nav-avatar { width:34px;height:34px;background:linear-gradient(135deg,var(--accent),#06b6d4);border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;cursor:pointer;border:2px solid var(--border); }
 
-    /* PARTICLE */
-    #particle-canvas { position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:0;opacity:0.3; }
+    .back-btn {
+      background: rgba(255,255,255,0.08);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px 16px;
+      color: var(--text);
+      text-decoration: none;
+      font-size: 14px;
+      font-weight: 600;
+      transition: all 0.2s ease;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
 
-    /* PAGE */
-    .page { padding-top: var(--nav-h); min-height: 100vh; position: relative; z-index: 1; }
+    .back-btn:hover {
+      background: rgba(124, 58, 237, 0.1);
+      border-color: var(--accent);
+    }
 
-    /* PROFILE BANNER */
-    .profile-banner {
-      height: 220px;
-      background: linear-gradient(135deg,#0d0820 0%,#1a0a35 40%,#06142a 100%);
-      border-bottom: 1px solid var(--border);
-      position: relative; overflow: hidden;
+    .profile-header {
+      display: flex;
+      align-items: center;
+      gap: 24px;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 32px;
+      margin-bottom: 32px;
     }
-    .banner-bg {
-      position: absolute; inset: 0;
-      background:
-        radial-gradient(ellipse at 20% 50%,rgba(124,58,237,0.25) 0%,transparent 60%),
-        radial-gradient(ellipse at 75% 30%,rgba(6,182,212,0.15) 0%,transparent 50%);
-    }
-    .banner-shapes { position:absolute;inset:0;overflow:hidden;pointer-events:none; }
-    .bs { position:absolute;border-radius:50%;opacity:0.12; }
-    .bs1 { width:300px;height:300px;background:var(--accent);top:-100px;right:200px;filter:blur(60px); }
-    .bs2 { width:200px;height:200px;background:var(--accent2);bottom:-50px;right:100px;filter:blur(40px); }
-    .bs3 { width:150px;height:150px;background:#9d5cf6;top:20px;left:300px;filter:blur(50px); }
 
-    /* PROFILE INFO */
-    .profile-info-wrap {
-      max-width: 1100px; margin: 0 auto; padding: 0 32px;
-      position: relative;
-    }
-    .profile-avatar-area {
-      display: flex; align-items: flex-end; gap: 20px;
-      transform: translateY(-36px);
-    }
-    .profile-avatar-ring {
-      width: 96px; height: 96px; border-radius: 50%;
-      background: linear-gradient(135deg,var(--accent),var(--accent2));
-      display: flex; align-items: center; justify-content: center;
-      font-size: 36px; font-weight: 900; color: #fff;
-      border: 4px solid var(--bg);
-      box-shadow: 0 0 32px rgba(124,58,237,0.5);
+    .profile-avatar {
+      width: 120px;
+      height: 120px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 48px;
+      font-weight: 700;
+      color: #fff;
       flex-shrink: 0;
     }
-    .profile-meta { flex: 1; padding-bottom: 4px; }
-    .profile-username { font-size: 24px; font-weight: 900; color: var(--text); letter-spacing: -0.5px; margin-bottom: 6px; display:flex;align-items:center;gap:10px; }
-    .rank-pill { background:rgba(124,58,237,0.2);border:1px solid rgba(124,58,237,0.4);border-radius:20px;padding:3px 12px;font-size:11px;font-weight:700;color:#a78bfa;letter-spacing:0.5px; }
-    .profile-sub { font-size:13px;color:var(--muted);display:flex;gap:16px;flex-wrap:wrap; }
-    .profile-sub span { display:flex;align-items:center;gap:5px; }
-    .profile-actions { display:flex;gap:8px;align-items:flex-end;padding-bottom:4px; }
-    .btn-primary { background:linear-gradient(135deg,var(--accent),#9d5cf6);border:none;border-radius:6px;padding:9px 18px;color:#fff;font-size:12px;font-weight:700;cursor:pointer;transition:opacity 0.2s,box-shadow 0.2s; }
-    .btn-primary:hover { opacity:0.9;box-shadow:0 0 18px rgba(124,58,237,0.5); }
-    .btn-outline { background:transparent;border:1px solid rgba(124,58,237,0.4);border-radius:6px;padding:9px 16px;color:var(--text);font-size:12px;font-weight:600;cursor:pointer;transition:background 0.2s,border-color 0.2s; }
-    .btn-outline:hover { background:rgba(124,58,237,0.1);border-color:var(--accent); }
 
-    /* STATS ROW */
-    .stats-row {
-      max-width: 1100px; margin: -16px auto 0; padding: 0 32px 24px;
+    .profile-info {
+      flex: 1;
     }
-    .stats-grid {
-      display: flex; gap: 0;
-      background: var(--card); border: 1px solid var(--border); border-radius: 8px; overflow: hidden;
-    }
-    .stat-cell {
-      flex: 1; padding: 16px 20px; text-align: center; border-right: 1px solid var(--border);
-      transition: background 0.15s;
-    }
-    .stat-cell:last-child { border-right: none; }
-    .stat-cell:hover { background: var(--card-hover); }
-    .stat-value { font-size: 22px; font-weight: 900; color: var(--text); margin-bottom: 3px; }
-    .stat-value.gold { color: var(--gold); }
-    .stat-value.cyan { color: var(--accent2); }
-    .stat-label { font-size: 10px; font-weight: 700; color: var(--muted); letter-spacing: 1px; text-transform: uppercase; }
 
-    /* TAB NAV */
-    .tab-wrap { max-width: 1100px; margin: 0 auto; padding: 0 32px; }
-    .tab-nav {
-      display: flex; gap: 4px; border-bottom: 1px solid var(--border); margin-bottom: 24px;
+    .profile-name {
+      font-size: 32px;
+      font-weight: 800;
+      color: var(--text);
+      margin-bottom: 8px;
     }
-    .tab-btn {
-      padding: 10px 18px; border: none; background: transparent; color: var(--muted);
-      font-size: 13px; font-weight: 600; cursor: pointer; border-bottom: 2px solid transparent;
-      margin-bottom: -1px; transition: color 0.15s, border-color 0.15s;
+
+    .profile-level {
+      font-size: 18px;
+      color: var(--accent);
+      font-weight: 600;
+      margin-bottom: 16px;
     }
-    .tab-btn:hover { color: var(--text); }
-    .tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); }
 
-    /* TAB PANELS */
-    .tab-panel { display: none; }
-    .tab-panel.active { display: block; }
-
-    /* CONTENT LAYOUT */
-    .two-col { display: grid; grid-template-columns: 1fr 340px; gap: 20px; }
-    .three-col { display: grid; grid-template-columns: repeat(3,1fr); gap: 16px; }
-
-    /* CARDS */
-    .card {
-      background: var(--card); border: 1px solid var(--border); border-radius: 8px; overflow: hidden;
-      margin-bottom: 20px;
+    .profile-stats {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 24px;
     }
-    .card-header {
-      padding: 14px 18px; border-bottom: 1px solid var(--border);
-      display: flex; align-items: center; justify-content: space-between;
-    }
-    .card-title { font-size: 14px; font-weight: 700; color: var(--text); display:flex;align-items:center;gap:8px; }
-    .card-body { padding: 16px 18px; }
 
-    /* RECENT GAMES TABLE */
-    .games-table { width:100%;border-collapse:collapse; }
-    .games-table th { font-size:10px;font-weight:700;color:var(--muted);letter-spacing:1px;text-transform:uppercase;padding:8px 14px;text-align:left;border-bottom:1px solid var(--border);background:rgba(0,0,0,0.2); }
-    .games-table td { padding:10px 14px;font-size:13px;color:var(--text);border-bottom:1px solid rgba(124,58,237,0.06); }
-    .games-table tr:last-child td { border-bottom:none; }
-    .games-table tr:hover td { background:rgba(124,58,237,0.04); }
-    .result-win { color:var(--success);font-weight:700;background:rgba(34,197,94,0.1);padding:2px 8px;border-radius:4px;font-size:11px; }
-    .result-loss { color:var(--red);font-weight:700;background:rgba(239,68,68,0.1);padding:2px 8px;border-radius:4px;font-size:11px; }
-
-    /* TECHNIQUE CARDS */
-    .technique-card {
-      background: rgba(0,0,0,0.25); border: 1px solid var(--border); border-radius: 8px;
-      padding: 16px; text-align: center; transition: border-color 0.2s,background 0.2s;
+    .stat-card {
+      text-align: center;
     }
-    .technique-card:hover { border-color:rgba(124,58,237,0.5);background:rgba(124,58,237,0.05); }
-    .technique-icon { font-size: 32px; margin-bottom: 8px; }
-    .technique-name { font-size: 13px; font-weight: 700; color: var(--text); margin-bottom: 4px; }
-    .technique-pct { font-size: 11px; color: var(--muted); margin-bottom: 8px; }
-    .mini-bar { height: 4px; background: rgba(255,255,255,0.08); border-radius: 2px; overflow: hidden; }
-    .mini-bar-fill { height: 100%; border-radius: 2px; background: linear-gradient(90deg,var(--accent),var(--accent2)); }
 
-    /* RANK PROGRESS */
-    .rank-section { margin-bottom: 20px; }
-    .rank-display { display:flex;align-items:center;justify-content:space-between;margin-bottom:10px; }
-    .rank-badge-large { background:rgba(124,58,237,0.15);border:1px solid rgba(124,58,237,0.35);border-radius:6px;padding:6px 14px;font-size:13px;font-weight:700;color:#a78bfa; }
-    .rank-next { font-size:12px;color:var(--muted); }
-    .xp-bar-wrap { position:relative;height:10px;background:rgba(255,255,255,0.08);border-radius:5px;overflow:hidden;margin-bottom:6px; }
-    .xp-bar-fill { height:100%;border-radius:5px;background:linear-gradient(90deg,var(--accent),var(--accent2));transition:width 0.4s ease; }
-    .xp-label { display:flex;justify-content:space-between;font-size:11px;color:var(--muted); }
+    .stat-value {
+      font-size: 24px;
+      font-weight: 800;
+      color: var(--text);
+      margin-bottom: 4px;
+    }
 
-    /* SORCERER STATS */
-    .stats-2x2 { display:grid;grid-template-columns:1fr 1fr;gap:12px; }
-    .stat-box { background:rgba(0,0,0,0.3);border:1px solid var(--border);border-radius:6px;padding:14px;text-align:center; }
-    .stat-box-val { font-size:20px;font-weight:800;color:var(--accent2);margin-bottom:3px; }
-    .stat-box-label { font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:0.8px; }
+    .stat-label {
+      font-size: 12px;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
 
-    /* GAMES TAB */
-    .game-played-card {
-      background: rgba(0,0,0,0.25);border:1px solid var(--border);border-radius:8px;
-      padding:16px;display:flex;gap:14px;align-items:center;margin-bottom:12px;
-      transition:border-color 0.2s,background 0.2s;cursor:pointer;
+    .main-content {
+      display: grid;
+      grid-template-columns: 2fr 1fr;
+      gap: 32px;
     }
-    .game-played-card:hover { border-color:rgba(124,58,237,0.4);background:rgba(124,58,237,0.05); }
-    .game-thumb-small {
-      width:70px;height:70px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:24px;flex-shrink:0;
-    }
-    .game-played-info { flex:1; }
-    .game-played-name { font-size:14px;font-weight:700;color:var(--text);margin-bottom:4px; }
-    .game-played-meta { font-size:12px;color:var(--muted);display:flex;gap:12px;flex-wrap:wrap; }
-    .game-played-meta span { display:flex;align-items:center;gap:4px; }
-    .game-played-stat { text-align:right; }
-    .game-played-hours { font-size:20px;font-weight:800;color:var(--accent2); }
-    .game-played-hrs-label { font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:0.8px; }
 
-    /* ACHIEVEMENTS */
-    .ach-filter { display:flex;gap:6px;margin-bottom:16px; }
-    .ach-filter-btn { padding:6px 14px;border:1px solid var(--border);border-radius:20px;background:transparent;color:var(--muted);font-size:12px;font-weight:600;cursor:pointer;transition:all 0.15s; }
-    .ach-filter-btn:hover,.ach-filter-btn.active { background:rgba(124,58,237,0.15);border-color:rgba(124,58,237,0.4);color:var(--text); }
-    .ach-grid { display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px; }
-    .ach-card {
-      background:rgba(0,0,0,0.3);border:1px solid var(--border);border-radius:8px;
-      padding:16px;text-align:center;transition:all 0.2s;cursor:pointer;
+    .games-section {
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
     }
-    .ach-card:hover { border-color:rgba(124,58,237,0.5);transform:translateY(-2px); }
-    .ach-card.locked { opacity:0.4;filter:grayscale(0.8); }
-    .ach-icon { font-size:28px;margin-bottom:8px; }
-    .ach-name { font-size:12px;font-weight:700;color:var(--text);margin-bottom:4px; }
-    .ach-desc { font-size:10px;color:var(--muted);line-height:1.4; }
-    .ach-unlocked-badge { display:inline-block;margin-top:6px;background:rgba(34,197,94,0.15);border:1px solid rgba(34,197,94,0.3);border-radius:4px;padding:2px 8px;font-size:10px;font-weight:700;color:var(--success); }
 
-    /* FRIENDS */
-    .friend-row {
-      display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid rgba(124,58,237,0.07);
+    .section-title {
+      font-size: 20px;
+      font-weight: 700;
+      color: var(--text);
+      margin-bottom: 16px;
     }
-    .friend-row:last-child { border-bottom:none; }
-    .friend-avatar-lg {
-      width:44px;height:44px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:700;flex-shrink:0;position:relative;
-    }
-    .friend-status-dot {
-      position:absolute;bottom:1px;right:1px;width:11px;height:11px;border-radius:50%;border:2px solid var(--card);
-    }
-    .friend-info-col { flex:1; }
-    .friend-row-name { font-size:14px;font-weight:700;color:var(--text);margin-bottom:2px;display:flex;align-items:center;gap:8px; }
-    .friend-row-status { font-size:12px;color:var(--muted); }
-    .friend-row-game { font-size:12px;color:var(--accent2); }
-    .friend-actions { display:flex;gap:6px; }
-    .btn-sm { padding:6px 12px;border-radius:5px;font-size:11px;font-weight:700;cursor:pointer;transition:all 0.15s;border:none; }
-    .btn-sm-outline { background:transparent;border:1px solid var(--border);color:var(--text);border-radius:5px;padding:6px 12px;font-size:11px;font-weight:700;cursor:pointer;transition:all 0.15s; }
-    .btn-sm-outline:hover { border-color:var(--accent);background:rgba(124,58,237,0.1); }
 
-    /* ACTIVITY */
-    .activity-timeline { position:relative;padding-left:28px; }
-    .activity-timeline::before { content:'';position:absolute;left:9px;top:0;bottom:0;width:2px;background:var(--border); }
-    .activity-event { position:relative;margin-bottom:20px; }
-    .activity-dot { position:absolute;left:-23px;top:4px;width:12px;height:12px;border-radius:50%;border:2px solid var(--bg); }
-    .activity-content { background:rgba(0,0,0,0.25);border:1px solid var(--border);border-radius:6px;padding:12px 14px; }
-    .activity-event-title { font-size:13px;font-weight:600;color:var(--text);margin-bottom:3px; }
-    .activity-event-meta { font-size:11px;color:var(--muted);display:flex;gap:10px; }
-
-    /* RESPONSIVE */
-    @media (max-width:900px) {
-      .two-col { grid-template-columns:1fr; }
-      .three-col { grid-template-columns:1fr 1fr; }
-      .profile-avatar-area { flex-wrap:wrap; }
-      .profile-actions { flex-wrap:wrap; }
-      .stats-grid { flex-wrap:wrap; }
-      .stat-cell { min-width:80px; border-bottom:1px solid var(--border); }
+    .game-stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 16px;
     }
-    @media (max-width:600px) {
-      .three-col { grid-template-columns:1fr; }
-      .tab-wrap,.stats-row { padding:0 16px; }
-      .ach-grid { grid-template-columns:repeat(2,1fr); }
+
+    .game-stat-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 20px;
+      transition: all 0.2s ease;
+    }
+
+    .game-stat-card:hover {
+      background: var(--card-hover);
+      border-color: var(--accent);
+    }
+
+    .game-header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+
+    .game-icon {
+      width: 40px;
+      height: 40px;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 20px;
+      background: linear-gradient(135deg, var(--accent), #9d5cf6);
+    }
+
+    .game-name {
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--text);
+    }
+
+    .game-stats {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 12px;
+    }
+
+    .game-stat {
+      text-align: center;
+      padding: 12px;
+      background: rgba(255,255,255,0.03);
+      border-radius: 8px;
+    }
+
+    .game-stat-value {
+      font-size: 18px;
+      font-weight: 700;
+      color: var(--text);
+      margin-bottom: 4px;
+    }
+
+    .game-stat-label {
+      font-size: 11px;
+      color: var(--muted);
+      text-transform: uppercase;
+    }
+
+    .sidebar {
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+    }
+
+    .achievements-panel {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 20px;
+    }
+
+    .achievement-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px;
+      background: rgba(255,255,255,0.03);
+      border-radius: 8px;
+      margin-bottom: 12px;
+    }
+
+    .achievement-item:last-child {
+      margin-bottom: 0;
+    }
+
+    .achievement-icon {
+      width: 40px;
+      height: 40px;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 20px;
+      background: linear-gradient(135deg, var(--gold), #f97316);
+    }
+
+    .achievement-info {
+      flex: 1;
+    }
+
+    .achievement-name {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text);
+      margin-bottom: 2px;
+    }
+
+    .achievement-desc {
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    .recent-activity {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 20px;
+    }
+
+    .activity-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 0;
+      border-bottom: 1px solid rgba(255,255,255,0.05);
+    }
+
+    .activity-item:last-child {
+      border-bottom: none;
+    }
+
+    .activity-icon {
+      width: 32px;
+      height: 32px;
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 16px;
+      background: var(--accent);
+    }
+
+    .activity-text {
+      flex: 1;
+      font-size: 13px;
+      color: var(--text);
+    }
+
+    .activity-time {
+      font-size: 11px;
+      color: var(--muted);
+    }
+
+    .loading {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 40px;
+      color: var(--muted);
+    }
+
+    .spinner {
+      width: 24px;
+      height: 24px;
+      border: 2px solid rgba(124, 58, 237, 0.3);
+      border-radius: 50%;
+      border-top-color: var(--accent);
+      animation: spin 1s ease-in-out infinite;
+      margin-right: 12px;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    @media (max-width: 768px) {
+      .main-content {
+        grid-template-columns: 1fr;
+      }
+      
+      .profile-header {
+        flex-direction: column;
+        text-align: center;
+      }
+      
+      .profile-stats {
+        grid-template-columns: repeat(2, 1fr);
+      }
+      
+      .game-stats-grid {
+        grid-template-columns: 1fr;
+      }
     }
   </style>
 </head>
 <body>
-<canvas id="particle-canvas"></canvas>
-
-<!-- NAV -->
-<nav class="nav">
-  <a class="nav-logo" href="/nexus/">
-    <div class="nav-logo-icon">N</div>
-    <span class="nav-logo-text">NEXUS</span>
-  </a>
-  <div class="nav-links">
-    <a href="/nexus/" class="nav-link">Home</a>
-    <a href="/nexus/leaderboard.html" class="nav-link">Leaderboard</a>
-    <a href="/nexus/profile.html" class="nav-link active">Profile</a>
-    <a href="/nexus/store.html" class="nav-link">Store</a>
-  </div>
-  <div class="nav-right">
-    <div class="nav-coins">
-      <div class="coin-hex"></div>
-      <span>1,250</span>
-    </div>
-    <div class="nav-avatar">S</div>
-  </div>
-</nav>
-
-<div class="page">
-
-  <!-- PROFILE BANNER -->
-  <div class="profile-banner">
-    <div class="banner-bg"></div>
-    <div class="banner-shapes">
-      <div class="bs bs1"></div>
-      <div class="bs bs2"></div>
-      <div class="bs bs3"></div>
-    </div>
-  </div>
-
-  <!-- PROFILE INFO -->
-  <div class="profile-info-wrap">
-    <div class="profile-avatar-area">
-      <div class="profile-avatar-ring">S</div>
-      <div class="profile-meta">
-        <div class="profile-username">
-          SorcererOne
-          <span class="rank-pill">⚡ Grade 1 Sorcerer</span>
-        </div>
-        <div class="profile-sub">
-          <span>📅 Joined March 2025</span>
-          <span>📍 Tokyo, JP</span>
-          <span style="color:var(--success);">● Online Now</span>
-        </div>
-      </div>
-      <div class="profile-actions">
-        <button class="btn-primary">✏ EDIT PROFILE</button>
-        <button class="btn-outline">👥 SEND FRIEND REQUEST</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- STATS ROW -->
-  <div class="stats-row">
-    <div class="stats-grid">
-      <div class="stat-cell">
-        <div class="stat-value">12,847</div>
-        <div class="stat-label">Total Kills</div>
-      </div>
-      <div class="stat-cell">
-        <div class="stat-value" style="color:var(--success)">342</div>
-        <div class="stat-label">Wins</div>
-      </div>
-      <div class="stat-cell">
-        <div class="stat-value">1,204</div>
-        <div class="stat-label">Matches</div>
-      </div>
-      <div class="stat-cell">
-        <div class="stat-value cyan">847h</div>
-        <div class="stat-label">Hours Played</div>
-      </div>
-      <div class="stat-cell">
-        <div class="stat-value gold">⬡ 84,200</div>
-        <div class="stat-label">NexusCoin Earned</div>
-      </div>
-    </div>
-  </div>
-
-  <!-- TABS -->
-  <div class="tab-wrap">
-    <div class="tab-nav">
-      <button class="tab-btn active" data-tab="overview">Overview</button>
-      <button class="tab-btn" data-tab="games">Games</button>
-      <button class="tab-btn" data-tab="achievements">Achievements</button>
-      <button class="tab-btn" data-tab="friends">Friends</button>
-      <button class="tab-btn" data-tab="activity">Activity</button>
+  <div class="container">
+    <div class="header">
+      <a href="/" class="back-btn">
+        ← Back to NEXUS
+      </a>
     </div>
 
-    <!-- OVERVIEW TAB -->
-    <div class="tab-panel active" id="tab-overview">
-      <div class="two-col">
-        <div>
-          <!-- Recent Games -->
-          <div class="card">
-            <div class="card-header">
-              <div class="card-title">🎮 Recent Games</div>
-              <span style="font-size:12px;color:var(--muted)">Last 7 days</span>
-            </div>
-            <table class="games-table">
-              <thead>
-                <tr>
-                  <th>Game</th><th>Mode</th><th>Result</th><th>Kills</th><th>Date</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr><td>HUNTERS</td><td>Hard</td><td><span class="result-win">WIN</span></td><td>24</td><td style="color:var(--muted)">Apr 25</td></tr>
-                <tr><td>Cursed Arena</td><td>Ranked</td><td><span class="result-win">WIN</span></td><td>18</td><td style="color:var(--muted)">Apr 25</td></tr>
-                <tr><td>HUNTERS</td><td>Normal</td><td><span class="result-loss">LOSS</span></td><td>7</td><td style="color:var(--muted)">Apr 24</td></tr>
-                <tr><td>Domain Defender</td><td>Survival</td><td><span class="result-win">WIN</span></td><td>—</td><td style="color:var(--muted)">Apr 24</td></tr>
-                <tr><td>HUNTERS</td><td>Hard</td><td><span class="result-win">WIN</span></td><td>31</td><td style="color:var(--muted)">Apr 23</td></tr>
-                <tr><td>Grade Trials</td><td>Casual</td><td><span class="result-loss">LOSS</span></td><td>4</td><td style="color:var(--muted)">Apr 22</td></tr>
-              </tbody>
-            </table>
+    <div class="profile-header">
+      <div class="profile-avatar" id="profile-avatar">?</div>
+      <div class="profile-info">
+        <div class="profile-name" id="profile-name">Loading...</div>
+        <div class="profile-level" id="profile-level">Level ?</div>
+        <div class="profile-stats">
+          <div class="stat-card">
+            <div class="stat-value" id="total-xp">-</div>
+            <div class="stat-label">Total XP</div>
           </div>
-
-          <!-- Favorite Techniques -->
-          <div class="card">
-            <div class="card-header">
-              <div class="card-title">⚡ Favorite Techniques</div>
-            </div>
-            <div class="card-body">
-              <div class="three-col">
-                <div class="technique-card">
-                  <div class="technique-icon">♾️</div>
-                  <div class="technique-name">Infinity</div>
-                  <div class="technique-pct">Used in 73% of matches</div>
-                  <div class="mini-bar"><div class="mini-bar-fill" style="width:73%"></div></div>
-                </div>
-                <div class="technique-card">
-                  <div class="technique-icon">🌀</div>
-                  <div class="technique-name">Hollow Purple</div>
-                  <div class="technique-pct">Used in 48% of matches</div>
-                  <div class="mini-bar"><div class="mini-bar-fill" style="width:48%"></div></div>
-                </div>
-                <div class="technique-card">
-                  <div class="technique-icon">🏛️</div>
-                  <div class="technique-name">Domain Expansion</div>
-                  <div class="technique-pct">Used in 22% of matches</div>
-                  <div class="mini-bar"><div class="mini-bar-fill" style="width:22%"></div></div>
-                </div>
-              </div>
-            </div>
+          <div class="stat-card">
+            <div class="stat-value" id="total-games">-</div>
+            <div class="stat-label">Games Played</div>
           </div>
-        </div>
-
-        <div>
-          <!-- Rank Progress -->
-          <div class="card">
-            <div class="card-header">
-              <div class="card-title">🏆 Rank Progress</div>
-            </div>
-            <div class="card-body">
-              <div class="rank-display" style="margin-bottom:14px;">
-                <div>
-                  <div style="font-size:11px;color:var(--muted);margin-bottom:4px;">CURRENT RANK</div>
-                  <div class="rank-badge-large">⚡ Grade 1 Sorcerer</div>
-                </div>
-                <div style="text-align:right;">
-                  <div style="font-size:11px;color:var(--muted);margin-bottom:4px;">NEXT RANK</div>
-                  <div style="font-size:13px;font-weight:700;color:#f59e0b;">✨ Special Grade</div>
-                </div>
-              </div>
-              <div class="xp-bar-wrap">
-                <div class="xp-bar-fill" style="width:67%"></div>
-              </div>
-              <div class="xp-label">
-                <span>67,400 XP</span>
-                <span>100,000 XP</span>
-              </div>
-              <div style="margin-top:12px;padding:10px;background:rgba(124,58,237,0.08);border:1px solid rgba(124,58,237,0.2);border-radius:6px;font-size:12px;color:var(--muted);text-align:center;">
-                32,600 XP to <span style="color:#f59e0b;font-weight:700;">Special Grade</span>
-              </div>
-            </div>
+          <div class="stat-card">
+            <div class="stat-value" id="total-wins">-</div>
+            <div class="stat-label">Total Wins</div>
           </div>
-
-          <!-- Sorcerer Stats -->
-          <div class="card">
-            <div class="card-header">
-              <div class="card-title">📊 Sorcerer Stats</div>
-            </div>
-            <div class="card-body">
-              <div class="stats-2x2">
-                <div class="stat-box">
-                  <div class="stat-box-val">3.47</div>
-                  <div class="stat-box-label">K/D Ratio</div>
-                </div>
-                <div class="stat-box">
-                  <div class="stat-box-val">28.4%</div>
-                  <div class="stat-box-label">Win Rate</div>
-                </div>
-                <div class="stat-box">
-                  <div class="stat-box-val">22m</div>
-                  <div class="stat-box-label">Avg. Match</div>
-                </div>
-                <div class="stat-box">
-                  <div class="stat-box-val" style="color:var(--gold)">Wave 47</div>
-                  <div class="stat-box-label">Best Wave</div>
-                </div>
-              </div>
-            </div>
+          <div class="stat-card">
+            <div class="stat-value" id="win-rate">-</div>
+            <div class="stat-label">Win Rate</div>
           </div>
         </div>
       </div>
     </div>
 
-    <!-- GAMES TAB -->
-    <div class="tab-panel" id="tab-games">
-      <div class="game-played-card">
-        <div class="game-thumb-small" style="background:linear-gradient(135deg,#1a0535,#2d0a5e)">⚔️</div>
-        <div class="game-played-info">
-          <div class="game-played-name">HUNTERS</div>
-          <div class="game-played-meta">
-            <span>🏆 12 Achievements</span>
-            <span>📅 Last played today</span>
-            <span style="color:var(--success);">● Favorite Game</span>
+    <div class="main-content">
+      <div class="games-section">
+        <h2 class="section-title">Game Statistics</h2>
+        <div class="game-stats-grid" id="game-stats-grid">
+          <div class="loading">
+            <div class="spinner"></div>
+            Loading game statistics...
           </div>
         </div>
-        <div class="game-played-stat">
-          <div class="game-played-hours">47</div>
-          <div class="game-played-hrs-label">Hours</div>
-        </div>
       </div>
-      <div class="game-played-card">
-        <div class="game-thumb-small" style="background:linear-gradient(135deg,#0a1a10,#1a3a1a)">🌀</div>
-        <div class="game-played-info">
-          <div class="game-played-name">Cursed Arena</div>
-          <div class="game-played-meta">
-            <span>🏆 5 Achievements</span>
-            <span>📅 Last played 2 days ago</span>
-          </div>
-        </div>
-        <div class="game-played-stat">
-          <div class="game-played-hours">8</div>
-          <div class="game-played-hrs-label">Hours</div>
-        </div>
-      </div>
-      <div class="game-played-card">
-        <div class="game-thumb-small" style="background:linear-gradient(135deg,#1a1a05,#3a2a00)">🏯</div>
-        <div class="game-played-info">
-          <div class="game-played-name">Domain Defender</div>
-          <div class="game-played-meta">
-            <span>🏆 3 Achievements</span>
-            <span>📅 Last played 5 days ago</span>
-          </div>
-        </div>
-        <div class="game-played-stat">
-          <div class="game-played-hours">5</div>
-          <div class="game-played-hrs-label">Hours</div>
-        </div>
-      </div>
-      <div class="game-played-card">
-        <div class="game-thumb-small" style="background:linear-gradient(135deg,#05101a,#0a2035)">🎵</div>
-        <div class="game-played-info">
-          <div class="game-played-name">Grade Trials</div>
-          <div class="game-played-meta">
-            <span>🏆 2 Achievements</span>
-            <span>📅 Last played 1 week ago</span>
-          </div>
-        </div>
-        <div class="game-played-stat">
-          <div class="game-played-hours">3</div>
-          <div class="game-played-hrs-label">Hours</div>
-        </div>
-      </div>
-      <div class="game-played-card">
-        <div class="game-thumb-small" style="background:linear-gradient(135deg,#0a0505,#200a0a)">👻</div>
-        <div class="game-played-info">
-          <div class="game-played-name">Spirit Chase</div>
-          <div class="game-played-meta">
-            <span>🏆 1 Achievement</span>
-            <span>📅 Last played 2 weeks ago</span>
-          </div>
-        </div>
-        <div class="game-played-stat">
-          <div class="game-played-hours">1</div>
-          <div class="game-played-hrs-label">Hours</div>
-        </div>
-      </div>
-    </div>
 
-    <!-- ACHIEVEMENTS TAB -->
-    <div class="tab-panel" id="tab-achievements">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
-        <div class="ach-filter">
-          <button class="ach-filter-btn active" onclick="filterAch('all',this)">All</button>
-          <button class="ach-filter-btn" onclick="filterAch('unlocked',this)">Unlocked</button>
-          <button class="ach-filter-btn" onclick="filterAch('locked',this)">Locked</button>
+      <div class="sidebar">
+        <div class="achievements-panel">
+          <h3 class="section-title">Achievements</h3>
+          <div id="achievements">
+            <div class="achievement-item">
+              <div class="achievement-icon">🏆</div>
+              <div class="achievement-info">
+                <div class="achievement-name">First Victory</div>
+                <div class="achievement-desc">Win your first game</div>
+              </div>
+            </div>
+            <div class="achievement-item">
+              <div class="achievement-icon">⚡</div>
+              <div class="achievement-info">
+                <div class="achievement-name">Speed Demon</div>
+                <div class="achievement-desc">Complete a game in under 2 minutes</div>
+              </div>
+            </div>
+            <div class="achievement-item">
+              <div class="achievement-icon">🎯</div>
+              <div class="achievement-info">
+                <div class="achievement-name">Sharpshooter</div>
+                <div class="achievement-desc">Achieve 90% accuracy in HUNTERS</div>
+              </div>
+            </div>
+          </div>
         </div>
-        <div style="font-size:13px;font-weight:600;color:var(--muted);">
-          <span style="color:var(--accent2);">12</span> / 15 Achievements Unlocked
-        </div>
-      </div>
-      <div class="ach-grid" id="ach-grid">
-        <div class="ach-card" data-state="unlocked">
-          <div class="ach-icon">🏆</div>
-          <div class="ach-name">First Blood</div>
-          <div class="ach-desc">Get your first kill in HUNTERS</div>
-          <div class="ach-unlocked-badge">✓ Unlocked</div>
-        </div>
-        <div class="ach-card" data-state="unlocked">
-          <div class="ach-icon">💀</div>
-          <div class="ach-name">Cursed Slayer</div>
-          <div class="ach-desc">Kill 100 cursed spirits</div>
-          <div class="ach-unlocked-badge">✓ Unlocked</div>
-        </div>
-        <div class="ach-card" data-state="unlocked">
-          <div class="ach-icon">🌊</div>
-          <div class="ach-name">Wave Breaker</div>
-          <div class="ach-desc">Survive until Wave 20</div>
-          <div class="ach-unlocked-badge">✓ Unlocked</div>
-        </div>
-        <div class="ach-card" data-state="unlocked">
-          <div class="ach-icon">🏛️</div>
-          <div class="ach-name">Domain Master</div>
-          <div class="ach-desc">Activate Domain Expansion 10 times</div>
-          <div class="ach-unlocked-badge">✓ Unlocked</div>
-        </div>
-        <div class="ach-card" data-state="unlocked">
-          <div class="ach-icon">⚡</div>
-          <div class="ach-name">Speed Sorcerer</div>
-          <div class="ach-desc">Complete a match in under 5 minutes</div>
-          <div class="ach-unlocked-badge">✓ Unlocked</div>
-        </div>
-        <div class="ach-card" data-state="unlocked">
-          <div class="ach-icon">🎯</div>
-          <div class="ach-name">Perfect Aim</div>
-          <div class="ach-desc">Achieve 80%+ accuracy in a match</div>
-          <div class="ach-unlocked-badge">✓ Unlocked</div>
-        </div>
-        <div class="ach-card" data-state="unlocked">
-          <div class="ach-icon">🔥</div>
-          <div class="ach-name">On Fire</div>
-          <div class="ach-desc">Win 5 matches in a row</div>
-          <div class="ach-unlocked-badge">✓ Unlocked</div>
-        </div>
-        <div class="ach-card" data-state="unlocked">
-          <div class="ach-icon">💎</div>
-          <div class="ach-name">NexusCoin Collector</div>
-          <div class="ach-desc">Earn 10,000 NexusCoin total</div>
-          <div class="ach-unlocked-badge">✓ Unlocked</div>
-        </div>
-        <div class="ach-card" data-state="unlocked">
-          <div class="ach-icon">🛡️</div>
-          <div class="ach-name">Untouchable</div>
-          <div class="ach-desc">Survive a match without taking damage</div>
-          <div class="ach-unlocked-badge">✓ Unlocked</div>
-        </div>
-        <div class="ach-card" data-state="unlocked">
-          <div class="ach-icon">🌀</div>
-          <div class="ach-name">Hollow Purple Pro</div>
-          <div class="ach-desc">Use Hollow Purple 50 times</div>
-          <div class="ach-unlocked-badge">✓ Unlocked</div>
-        </div>
-        <div class="ach-card" data-state="unlocked">
-          <div class="ach-icon">👥</div>
-          <div class="ach-name">Social Sorcerer</div>
-          <div class="ach-desc">Add 5 friends on NEXUS</div>
-          <div class="ach-unlocked-badge">✓ Unlocked</div>
-        </div>
-        <div class="ach-card" data-state="unlocked">
-          <div class="ach-icon">🗓️</div>
-          <div class="ach-name">Dedicated Disciple</div>
-          <div class="ach-desc">Play 7 days in a row</div>
-          <div class="ach-unlocked-badge">✓ Unlocked</div>
-        </div>
-        <div class="ach-card locked" data-state="locked">
-          <div class="ach-icon">✨</div>
-          <div class="ach-name">Special Grade</div>
-          <div class="ach-desc">Reach Special Grade rank</div>
-          <div style="margin-top:6px;font-size:10px;color:var(--muted);">🔒 Locked</div>
-        </div>
-        <div class="ach-card locked" data-state="locked">
-          <div class="ach-icon">👑</div>
-          <div class="ach-name">Platform Legend</div>
-          <div class="ach-desc">Reach #1 on the global leaderboard</div>
-          <div style="margin-top:6px;font-size:10px;color:var(--muted);">🔒 Locked</div>
-        </div>
-        <div class="ach-card locked" data-state="locked">
-          <div class="ach-icon">💯</div>
-          <div class="ach-name">Completionist</div>
-          <div class="ach-desc">Unlock all other achievements</div>
-          <div style="margin-top:6px;font-size:10px;color:var(--muted);">🔒 Locked</div>
-        </div>
-      </div>
-    </div>
 
-    <!-- FRIENDS TAB -->
-    <div class="tab-panel" id="tab-friends">
-      <div class="card">
-        <div class="card-header">
-          <div class="card-title">👥 Friends <span style="background:rgba(34,197,94,0.15);color:var(--success);font-size:11px;font-weight:700;padding:2px 8px;border-radius:4px;">5 Online</span></div>
-          <span style="font-size:12px;color:var(--muted);">8 total friends</span>
-        </div>
-        <div class="card-body" style="padding:8px 18px;">
-          <div class="friend-row">
-            <div class="friend-avatar-lg" style="background:linear-gradient(135deg,#7c3aed,#06b6d4)">G<div class="friend-status-dot" style="background:var(--success)"></div></div>
-            <div class="friend-info-col">
-              <div class="friend-row-name">Gojo_User <span class="rank-pill" style="font-size:10px;">Special Grade</span></div>
-              <div class="friend-row-game">Playing HUNTERS</div>
-            </div>
-            <div class="friend-actions">
-              <button class="btn-sm-outline">VIEW</button>
-              <button class="btn-primary btn-sm" style="padding:6px 12px;font-size:11px;">INVITE</button>
-            </div>
-          </div>
-          <div class="friend-row">
-            <div class="friend-avatar-lg" style="background:linear-gradient(135deg,#dc2626,#7c3aed)">S<div class="friend-status-dot" style="background:var(--success)"></div></div>
-            <div class="friend-info-col">
-              <div class="friend-row-name">SukunaFan <span class="rank-pill" style="font-size:10px;">Grade 1</span></div>
-              <div class="friend-row-game">Playing Cursed Arena</div>
-            </div>
-            <div class="friend-actions">
-              <button class="btn-sm-outline">VIEW</button>
-              <button class="btn-primary btn-sm" style="padding:6px 12px;font-size:11px;">INVITE</button>
-            </div>
-          </div>
-          <div class="friend-row">
-            <div class="friend-avatar-lg" style="background:linear-gradient(135deg,#059669,#06b6d4)">M<div class="friend-status-dot" style="background:var(--success)"></div></div>
-            <div class="friend-info-col">
-              <div class="friend-row-name">MegumiFan <span class="rank-pill" style="font-size:10px;">Grade 2</span></div>
-              <div class="friend-row-game">In lobby</div>
-            </div>
-            <div class="friend-actions">
-              <button class="btn-sm-outline">VIEW</button>
-              <button class="btn-primary btn-sm" style="padding:6px 12px;font-size:11px;">INVITE</button>
-            </div>
-          </div>
-          <div class="friend-row">
-            <div class="friend-avatar-lg" style="background:linear-gradient(135deg,#d97706,#7c3aed)">N<div class="friend-status-dot" style="background:var(--success)"></div></div>
-            <div class="friend-info-col">
-              <div class="friend-row-name">NobFan <span class="rank-pill" style="font-size:10px;">Grade 1</span></div>
-              <div class="friend-row-game">Playing Domain Defender</div>
-            </div>
-            <div class="friend-actions">
-              <button class="btn-sm-outline">VIEW</button>
-              <button class="btn-primary btn-sm" style="padding:6px 12px;font-size:11px;">INVITE</button>
-            </div>
-          </div>
-          <div class="friend-row">
-            <div class="friend-avatar-lg" style="background:linear-gradient(135deg,#0891b2,#7c3aed)">Y<div class="friend-status-dot" style="background:var(--success)"></div></div>
-            <div class="friend-info-col">
-              <div class="friend-row-name">YujiItadori <span class="rank-pill" style="font-size:10px;">Grade 3</span></div>
-              <div class="friend-row-game">Playing HUNTERS</div>
-            </div>
-            <div class="friend-actions">
-              <button class="btn-sm-outline">VIEW</button>
-              <button class="btn-primary btn-sm" style="padding:6px 12px;font-size:11px;">INVITE</button>
-            </div>
-          </div>
-          <div class="friend-row">
-            <div class="friend-avatar-lg" style="background:linear-gradient(135deg,#4f46e5,#06b6d4)">T<div class="friend-status-dot" style="background:var(--muted)"></div></div>
-            <div class="friend-info-col">
-              <div class="friend-row-name">TenShadows <span class="rank-pill" style="font-size:10px;">Grade 2</span></div>
-              <div class="friend-row-status" style="color:var(--muted);">Last seen 3 hours ago</div>
-            </div>
-            <div class="friend-actions">
-              <button class="btn-sm-outline">VIEW</button>
-              <button class="btn-sm-outline">INVITE</button>
-            </div>
-          </div>
-          <div class="friend-row">
-            <div class="friend-avatar-lg" style="background:linear-gradient(135deg,#7c3aed,#dc2626)">C<div class="friend-status-dot" style="background:var(--muted)"></div></div>
-            <div class="friend-info-col">
-              <div class="friend-row-name">CursedKing <span class="rank-pill" style="font-size:10px;">Special Grade</span></div>
-              <div class="friend-row-status" style="color:var(--muted);">Last seen 8 hours ago</div>
-            </div>
-            <div class="friend-actions">
-              <button class="btn-sm-outline">VIEW</button>
-              <button class="btn-sm-outline">INVITE</button>
-            </div>
-          </div>
-          <div class="friend-row">
-            <div class="friend-avatar-lg" style="background:linear-gradient(135deg,#059669,#7c3aed)">R<div class="friend-status-dot" style="background:var(--muted)"></div></div>
-            <div class="friend-info-col">
-              <div class="friend-row-name">RyomenMaster <span class="rank-pill" style="font-size:10px;">Grade 1</span></div>
-              <div class="friend-row-status" style="color:var(--muted);">Last seen yesterday</div>
-            </div>
-            <div class="friend-actions">
-              <button class="btn-sm-outline">VIEW</button>
-              <button class="btn-sm-outline">INVITE</button>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- ACTIVITY TAB -->
-    <div class="tab-panel" id="tab-activity">
-      <div class="card">
-        <div class="card-header">
-          <div class="card-title">📜 Recent Activity</div>
-          <span style="font-size:12px;color:var(--muted)">Last 30 days</span>
-        </div>
-        <div class="card-body">
-          <div class="activity-timeline">
-            <div class="activity-event">
-              <div class="activity-dot" style="background:var(--success)"></div>
-              <div class="activity-content">
-                <div class="activity-event-title">🏆 Won a match in HUNTERS (Hard difficulty) — 24 kills</div>
-                <div class="activity-event-meta"><span style="color:var(--accent2);">HUNTERS</span><span>Apr 25, 2026</span></div>
-              </div>
-            </div>
-            <div class="activity-event">
-              <div class="activity-dot" style="background:var(--gold)"></div>
-              <div class="activity-content">
-                <div class="activity-event-title">🥇 Unlocked achievement: <span style="color:var(--gold)">Wave Breaker</span></div>
-                <div class="activity-event-meta"><span style="color:var(--accent2);">Achievement</span><span>Apr 24, 2026</span></div>
-              </div>
-            </div>
-            <div class="activity-event">
-              <div class="activity-dot" style="background:var(--accent)"></div>
-              <div class="activity-content">
-                <div class="activity-event-title">⚡ Reached <span style="color:#a78bfa;">Grade 1 Sorcerer</span> rank</div>
-                <div class="activity-event-meta"><span style="color:var(--accent2);">Rank Up</span><span>Apr 22, 2026</span></div>
-              </div>
-            </div>
-            <div class="activity-event">
-              <div class="activity-dot" style="background:var(--accent2)"></div>
-              <div class="activity-content">
-                <div class="activity-event-title">🎮 Started playing Cursed Arena</div>
-                <div class="activity-event-meta"><span style="color:var(--accent2);">New Game</span><span>Apr 20, 2026</span></div>
-              </div>
-            </div>
-            <div class="activity-event">
-              <div class="activity-dot" style="background:var(--gold)"></div>
-              <div class="activity-content">
-                <div class="activity-event-title">🥇 Unlocked achievement: <span style="color:var(--gold)">Hollow Purple Pro</span></div>
-                <div class="activity-event-meta"><span style="color:var(--accent2);">Achievement</span><span>Apr 18, 2026</span></div>
-              </div>
-            </div>
-            <div class="activity-event">
-              <div class="activity-dot" style="background:var(--success)"></div>
-              <div class="activity-content">
-                <div class="activity-event-title">💎 Earned 5,000 NexusCoin from weekly challenge rewards</div>
-                <div class="activity-event-meta"><span style="color:var(--accent2);">Reward</span><span>Apr 14, 2026</span></div>
-              </div>
-            </div>
-            <div class="activity-event">
-              <div class="activity-dot" style="background:var(--accent)"></div>
-              <div class="activity-content">
-                <div class="activity-event-title">🔥 Won 5 matches in a row — unlocked <span style="color:var(--gold);">On Fire</span></div>
-                <div class="activity-event-meta"><span style="color:var(--accent2);">Achievement</span><span>Apr 11, 2026</span></div>
-              </div>
-            </div>
-            <div class="activity-event">
-              <div class="activity-dot" style="background:var(--accent2)"></div>
-              <div class="activity-content">
-                <div class="activity-event-title">👥 Added CursedKing as a friend</div>
-                <div class="activity-event-meta"><span style="color:var(--accent2);">Social</span><span>Apr 9, 2026</span></div>
-              </div>
+        <div class="recent-activity">
+          <h3 class="section-title">Recent Activity</h3>
+          <div id="recent-activity">
+            <div class="loading">
+              <div class="spinner"></div>
+              Loading activity...
             </div>
           </div>
         </div>
       </div>
     </div>
   </div>
-</div>
 
-<script>
-// Particle background
-(function(){
-  const canvas=document.getElementById('particle-canvas');
-  const ctx=canvas.getContext('2d');
-  let W,H,particles=[];
-  function resize(){W=canvas.width=window.innerWidth;H=canvas.height=window.innerHeight;}
-  window.addEventListener('resize',resize);resize();
-  function rand(a,b){return Math.random()*(b-a)+a;}
-  function mkP(){return{x:rand(0,W),y:rand(H,H+50),r:rand(1,2.5),speed:rand(0.3,0.8),opacity:rand(0.2,0.7),color:Math.random()>0.5?'124,58,237':'6,182,212',drift:rand(-0.3,0.3),pulse:rand(0,Math.PI*2),pulseSpeed:rand(0.01,0.03)};}
-  for(let i=0;i<30;i++){const p=mkP();p.y=rand(0,H);particles.push(p);}
-  function tick(){
-    ctx.clearRect(0,0,W,H);
-    for(let i=0;i<particles.length;i++){
-      const p=particles[i];p.y-=p.speed;p.x+=p.drift;p.pulse+=p.pulseSpeed;
-      const alpha=p.opacity*(0.7+0.3*Math.sin(p.pulse));
-      ctx.beginPath();ctx.arc(p.x,p.y,p.r,0,Math.PI*2);ctx.fillStyle=`rgba(${p.color},${alpha})`;ctx.fill();
-      if(p.y<-10)particles[i]=mkP();
+  <script>
+    // Game icons mapping
+    const gameIcons = {
+      'hunters': '⚔️',
+      'cursed-arena': '🌀',
+      'domain-defender': '🏯',
+      'grade-trials': '🎵',
+      'spirit-chase': '👻',
+      'culling-colony': '💀'
+    };
+
+    // Game names mapping
+    const gameNames = {
+      'hunters': 'HUNTERS',
+      'cursed-arena': 'Cursed Arena',
+      'domain-defender': 'Domain Defender',
+      'grade-trials': 'Grade Trials',
+      'spirit-chase': 'Spirit Chase',
+      'culling-colony': 'Culling Colony'
+    };
+
+    // Format time duration
+    function formatTime(seconds) {
+      const hours = Math.floor(seconds / 3600);
+      const minutes = Math.floor((seconds % 3600) / 60);
+      if (hours > 0) {
+        return `${hours}h ${minutes}m`;
+      }
+      return `${minutes}m`;
     }
-    requestAnimationFrame(tick);
-  }
-  tick();
-})();
 
-// Tab switching
-document.querySelectorAll('.tab-btn').forEach(btn=>{
-  btn.addEventListener('click',function(){
-    document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
-    document.querySelectorAll('.tab-panel').forEach(p=>p.classList.remove('active'));
-    this.classList.add('active');
-    document.getElementById('tab-'+this.dataset.tab).classList.add('active');
-  });
-});
+    // Format relative time
+    function formatRelativeTime(dateString) {
+      const date = new Date(dateString);
+      const now = new Date();
+      const diff = now - date;
+      const minutes = Math.floor(diff / 60000);
+      const hours = Math.floor(minutes / 60);
+      const days = Math.floor(hours / 24);
 
-// Achievement filter
-function filterAch(type,btn){
-  document.querySelectorAll('.ach-filter-btn').forEach(b=>b.classList.remove('active'));
-  btn.classList.add('active');
-  document.querySelectorAll('.ach-card').forEach(card=>{
-    if(type==='all') card.style.display='';
-    else if(type==='unlocked') card.style.display=card.dataset.state==='unlocked'?'':'none';
-    else card.style.display=card.dataset.state==='locked'?'':'none';
-  });
-}
-</script>
+      if (days > 0) return `${days}d ago`;
+      if (hours > 0) return `${hours}h ago`;
+      if (minutes > 0) return `${minutes}m ago`;
+      return 'Just now';
+    }
+
+    // Load profile data
+    async function loadProfile() {
+      try {
+        const profile = await NexusAuth.getProfile();
+        if (!profile) {
+          window.location.href = '/login.html?returnTo=' + encodeURIComponent(window.location.href);
+          return;
+        }
+
+        document.getElementById('profile-name').textContent = profile.display_name;
+        document.getElementById('profile-level').textContent = `Level ${profile.level}`;
+        document.getElementById('profile-avatar').textContent = profile.display_name.charAt(0).toUpperCase();
+        document.getElementById('total-xp').textContent = profile.xp.toLocaleString();
+      } catch (error) {
+        console.error('Failed to load profile:', error);
+      }
+    }
+
+    // Load global stats
+    async function loadGlobalStats() {
+      try {
+        const leaderboard = await NexusDB.getGlobalLeaderboard(1000);
+        const userProfile = await NexusAuth.getProfile();
+        
+        if (userProfile) {
+          const userStats = leaderboard.find(p => p.playerId === userProfile.id);
+          if (userStats) {
+            document.getElementById('total-games').textContent = userStats.totalGames;
+            document.getElementById('total-wins').textContent = userStats.totalWins;
+            document.getElementById('win-rate').textContent = userStats.winRate + '%';
+          }
+        }
+      } catch (error) {
+        console.error('Failed to load global stats:', error);
+      }
+    }
+
+    // Load game statistics
+    async function loadGameStats() {
+      const container = document.getElementById('game-stats-grid');
+      
+      try {
+        const games = ['hunters', 'cursed-arena', 'domain-defender', 'grade-trials', 'spirit-chase', 'culling-colony'];
+        const gameStatsPromises = games.map(gameId => NexusDB.getMyStats(gameId));
+        const gameStats = await Promise.all(gameStatsPromises);
+
+        container.innerHTML = games.map((gameId, index) => {
+          const stats = gameStats[index];
+          const icon = gameIcons[gameId] || '🎮';
+          const name = gameNames[gameId] || gameId;
+
+          return `
+            <div class="game-stat-card">
+              <div class="game-header">
+                <div class="game-icon">${icon}</div>
+                <div class="game-name">${name}</div>
+              </div>
+              <div class="game-stats">
+                <div class="game-stat">
+                  <div class="game-stat-value">${stats.gamesPlayed}</div>
+                  <div class="game-stat-label">Games</div>
+                </div>
+                <div class="game-stat">
+                  <div class="game-stat-value">${stats.bestScore.toLocaleString()}</div>
+                  <div class="game-stat-label">Best Score</div>
+                </div>
+                <div class="game-stat">
+                  <div class="game-stat-value">${stats.totalWins}</div>
+                  <div class="game-stat-label">Wins</div>
+                </div>
+                <div class="game-stat">
+                  <div class="game-stat-value">${formatTime(stats.totalPlaytime)}</div>
+                  <div class="game-stat-label">Playtime</div>
+                </div>
+              </div>
+            </div>
+          `;
+        }).join('');
+      } catch (error) {
+        console.error('Failed to load game stats:', error);
+        container.innerHTML = '<div class="loading">Failed to load game statistics</div>';
+      }
+    }
+
+    // Load recent activity
+    async function loadRecentActivity() {
+      const container = document.getElementById('recent-activity');
+      
+      try {
+        const activity = await NexusDB.getActivityFeed(10);
+        const userProfile = await NexusAuth.getProfile();
+        
+        // Filter to only show current user's activity
+        const userActivity = activity.filter(item => item.playerId === userProfile.id);
+
+        if (userActivity.length === 0) {
+          container.innerHTML = '<div class="loading">No recent activity</div>';
+          return;
+        }
+
+        container.innerHTML = userActivity.slice(0, 5).map(item => {
+          const icon = gameIcons[item.gameId] || '🎮';
+          const result = item.won ? 'Won' : 'Played';
+          
+          return `
+            <div class="activity-item">
+              <div class="activity-icon">${icon}</div>
+              <div class="activity-text">
+                ${result} ${item.gameName} - ${item.score.toLocaleString()} pts
+              </div>
+              <div class="activity-time">${formatRelativeTime(item.recordedAt)}</div>
+            </div>
+          `;
+        }).join('');
+      } catch (error) {
+        console.error('Failed to load recent activity:', error);
+        container.innerHTML = '<div class="loading">Failed to load activity</div>';
+      }
+    }
+
+    // Initialize page
+    document.addEventListener('DOMContentLoaded', async () => {
+      // Check authentication
+      const isAuthenticated = await NexusAuth.requireAuth();
+      if (!isAuthenticated) return;
+
+      // Load all data
+      await Promise.all([
+        loadProfile(),
+        loadGlobalStats(),
+        loadGameStats(),
+        loadRecentActivity()
+      ]);
+    });
+  </script>
 </body>
 </html>

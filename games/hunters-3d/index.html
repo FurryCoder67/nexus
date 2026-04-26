@@ -1,0 +1,745 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HUNTERS 3D — NEXUS</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            background: #000;
+            color: #fff;
+            font-family: 'Segoe UI', sans-serif;
+            overflow: hidden;
+            user-select: none;
+        }
+        #gameContainer {
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+        }
+        #ui {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            pointer-events: none;
+            z-index: 100;
+        }
+        #hud {
+            position: absolute;
+            top: 20px; left: 20px;
+            pointer-events: all;
+        }
+        .hud-panel {
+            background: rgba(0,0,0,0.8);
+            border: 1px solid #7c3aed;
+            border-radius: 8px;
+            padding: 12px;
+            margin-bottom: 10px;
+            backdrop-filter: blur(10px);
+        }
+        #health-bar {
+            width: 200px;
+            height: 20px;
+            background: rgba(255,0,0,0.3);
+            border-radius: 10px;
+            overflow: hidden;
+        }
+        #health-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #ef4444, #22c55e);
+            width: 100%;
+            transition: width 0.3s ease;
+        }
+        #crosshair {
+            position: absolute;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            width: 20px; height: 20px;
+            border: 2px solid #7c3aed;
+            border-radius: 50%;
+            pointer-events: none;
+        }
+        #menu {
+            position: absolute;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0,0,0,0.9);
+            border: 2px solid #7c3aed;
+            border-radius: 12px;
+            padding: 40px;
+            text-align: center;
+            pointer-events: all;
+        }
+        .menu-title {
+            font-size: 48px;
+            font-weight: 900;
+            color: #7c3aed;
+            margin-bottom: 20px;
+            text-shadow: 0 0 20px #7c3aed;
+        }
+        .menu-btn {
+            display: block;
+            width: 200px;
+            padding: 15px;
+            margin: 10px auto;
+            background: linear-gradient(135deg, #7c3aed, #9d5cf6);
+            border: none;
+            border-radius: 8px;
+            color: white;
+            font-size: 16px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        .menu-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(124, 58, 237, 0.5);
+        }
+        #instructions {
+            position: absolute;
+            bottom: 20px; left: 20px;
+            color: #888;
+            font-size: 14px;
+            pointer-events: none;
+        }
+        #score {
+            position: absolute;
+            top: 20px; right: 20px;
+            font-size: 24px;
+            font-weight: 700;
+            color: #7c3aed;
+            text-shadow: 0 0 10px #7c3aed;
+        }
+        .hidden { display: none !important; }
+    </style>
+</head>
+<body>
+    <div id="gameContainer"></div>
+    
+    <div id="ui">
+        <div id="hud" class="hidden">
+            <div class="hud-panel">
+                <div>Health</div>
+                <div id="health-bar">
+                    <div id="health-fill"></div>
+                </div>
+            </div>
+            <div class="hud-panel">
+                <div>Ammo: <span id="ammo">30/90</span></div>
+                <div>Technique: <span id="technique">Domain Expansion</span></div>
+            </div>
+        </div>
+        
+        <div id="crosshair" class="hidden"></div>
+        
+        <div id="score" class="hidden">Score: <span id="score-value">0</span></div>
+        
+        <div id="menu">
+            <div class="menu-title">HUNTERS 3D</div>
+            <button class="menu-btn" onclick="startGame()">START MISSION</button>
+            <button class="menu-btn" onclick="showMultiplayer()">MULTIPLAYER</button>
+            <button class="menu-btn" onclick="showSettings()">SETTINGS</button>
+            <button class="menu-btn" onclick="window.location.href='/'">BACK TO NEXUS</button>
+        </div>
+        
+        <div id="instructions" class="hidden">
+            WASD: Move | Mouse: Look | Click: Shoot | R: Reload | Space: Jump | Shift: Sprint | E: Use Technique
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/PointerLockControls.js"></script>
+    <script src="../nexus-3d-engine.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+    <script src="../nexus-config.js"></script>
+    <script src="../nexus-auth.js"></script>
+    <script src="../nexus-cloud.js"></script>
+    <script src="../nexus-db.js"></script>
+    
+    <script>
+        class Hunters3D {
+            constructor() {
+                this.engine = null;
+                this.player = null;
+                this.enemies = [];
+                this.bullets = [];
+                this.powerups = [];
+                
+                this.gameState = {
+                    health: 100,
+                    ammo: 30,
+                    maxAmmo: 90,
+                    score: 0,
+                    kills: 0,
+                    technique: 'Domain Expansion',
+                    techniqueReady: true
+                };
+                
+                this.controls = null;
+                this.isPlaying = false;
+                this.startTime = 0;
+                
+                this.init();
+            }
+            
+            async init() {
+                // Initialize 3D engine
+                this.engine = new Nexus3D('gameContainer', {
+                    shadows: true,
+                    fog: true,
+                    postProcessing: true,
+                    physics: true
+                });
+                
+                // Wait for engine to load
+                await new Promise(resolve => {
+                    const checkEngine = () => {
+                        if (this.engine.scene) {
+                            resolve();
+                        } else {
+                            setTimeout(checkEngine, 100);
+                        }
+                    };
+                    checkEngine();
+                });
+                
+                this.setupControls();
+                this.createWorld();
+                this.setupEventListeners();
+                
+                // Set update callback
+                this.engine.onUpdate = (deltaTime) => this.update(deltaTime);
+            }
+            
+            setupControls() {
+                this.controls = new THREE.PointerLockControls(this.engine.camera, document.body);
+                
+                // Movement
+                this.movement = {
+                    forward: false,
+                    backward: false,
+                    left: false,
+                    right: false,
+                    jump: false,
+                    sprint: false
+                };
+                
+                this.velocity = new THREE.Vector3();
+                this.direction = new THREE.Vector3();
+            }
+            
+            createWorld() {
+                // Create arena floor
+                const floorGeometry = new THREE.PlaneGeometry(200, 200);
+                const floorMaterial = new THREE.MeshStandardMaterial({ 
+                    color: 0x1a1a2e,
+                    roughness: 0.8,
+                    metalness: 0.2
+                });
+                const floor = new THREE.Mesh(floorGeometry, floorMaterial);
+                floor.rotation.x = -Math.PI / 2;
+                floor.receiveShadow = true;
+                this.engine.scene.add(floor);
+                
+                // Create walls with cursed energy effects
+                this.createWalls();
+                
+                // Create obstacles and cover
+                this.createObstacles();
+                
+                // Create spawn points for enemies
+                this.spawnPoints = [
+                    new THREE.Vector3(20, 1, 20),
+                    new THREE.Vector3(-20, 1, 20),
+                    new THREE.Vector3(20, 1, -20),
+                    new THREE.Vector3(-20, 1, -20),
+                    new THREE.Vector3(0, 1, 30),
+                    new THREE.Vector3(0, 1, -30),
+                    new THREE.Vector3(30, 1, 0),
+                    new THREE.Vector3(-30, 1, 0)
+                ];
+                
+                // Create player
+                this.createPlayer();
+                
+                // Add atmospheric effects
+                this.createAtmosphere();
+            }
+            
+            createWalls() {
+                const wallHeight = 15;
+                const wallThickness = 2;
+                const arenaSize = 100;
+                
+                const wallMaterial = new THREE.MeshStandardMaterial({
+                    color: 0x2d1b69,
+                    emissive: 0x1a0d3d,
+                    roughness: 0.7,
+                    metalness: 0.3
+                });
+                
+                // North wall
+                const northWall = new THREE.Mesh(
+                    new THREE.BoxGeometry(arenaSize, wallHeight, wallThickness),
+                    wallMaterial
+                );
+                northWall.position.set(0, wallHeight/2, arenaSize/2);
+                northWall.castShadow = true;
+                this.engine.scene.add(northWall);
+                
+                // South wall
+                const southWall = northWall.clone();
+                southWall.position.z = -arenaSize/2;
+                this.engine.scene.add(southWall);
+                
+                // East wall
+                const eastWall = new THREE.Mesh(
+                    new THREE.BoxGeometry(wallThickness, wallHeight, arenaSize),
+                    wallMaterial
+                );
+                eastWall.position.set(arenaSize/2, wallHeight/2, 0);
+                eastWall.castShadow = true;
+                this.engine.scene.add(eastWall);
+                
+                // West wall
+                const westWall = eastWall.clone();
+                westWall.position.x = -arenaSize/2;
+                this.engine.scene.add(westWall);
+            }
+            
+            createObstacles() {
+                const obstacleMaterial = new THREE.MeshStandardMaterial({
+                    color: 0x4c1d95,
+                    roughness: 0.6,
+                    metalness: 0.4
+                });
+                
+                // Create various obstacles
+                for (let i = 0; i < 15; i++) {
+                    const obstacle = new THREE.Mesh(
+                        new THREE.BoxGeometry(
+                            Math.random() * 3 + 1,
+                            Math.random() * 4 + 2,
+                            Math.random() * 3 + 1
+                        ),
+                        obstacleMaterial
+                    );
+                    
+                    obstacle.position.set(
+                        (Math.random() - 0.5) * 80,
+                        obstacle.geometry.parameters.height / 2,
+                        (Math.random() - 0.5) * 80
+                    );
+                    
+                    obstacle.castShadow = true;
+                    obstacle.receiveShadow = true;
+                    this.engine.scene.add(obstacle);
+                }
+            }
+            
+            createPlayer() {
+                // Player is represented by the camera
+                this.engine.camera.position.set(0, 1.8, 0);
+                
+                // Add weapon model (simple for now)
+                const weaponGeometry = new THREE.BoxGeometry(0.1, 0.1, 0.5);
+                const weaponMaterial = new THREE.MeshStandardMaterial({ color: 0x333333 });
+                this.weapon = new THREE.Mesh(weaponGeometry, weaponMaterial);
+                this.weapon.position.set(0.3, -0.2, -0.5);
+                this.engine.camera.add(this.weapon);
+            }
+            
+            createAtmosphere() {
+                // Add particle effects
+                this.engine.createParticleSystem({
+                    count: 500,
+                    spread: 200,
+                    color: 0x7c3aed,
+                    size: 0.5,
+                    opacity: 0.3
+                });
+                
+                // Add floating cursed energy orbs
+                for (let i = 0; i < 20; i++) {
+                    const orb = new THREE.Mesh(
+                        new THREE.SphereGeometry(0.2, 8, 8),
+                        new THREE.MeshBasicMaterial({
+                            color: 0x06b6d4,
+                            transparent: true,
+                            opacity: 0.6
+                        })
+                    );
+                    
+                    orb.position.set(
+                        (Math.random() - 0.5) * 100,
+                        Math.random() * 10 + 2,
+                        (Math.random() - 0.5) * 100
+                    );
+                    
+                    this.engine.scene.add(orb);
+                    
+                    // Animate orbs
+                    this.engine.animate(orb.position, 'y', orb.position.y + Math.random() * 3, 2000 + Math.random() * 2000);
+                }
+            }
+            
+            spawnEnemy() {
+                const spawnPoint = this.spawnPoints[Math.floor(Math.random() * this.spawnPoints.length)];
+                
+                // Create enemy geometry
+                const enemyGeometry = new THREE.ConeGeometry(0.5, 2, 8);
+                const enemyMaterial = new THREE.MeshStandardMaterial({
+                    color: 0xff4444,
+                    emissive: 0x330000
+                });
+                
+                const enemy = new THREE.Mesh(enemyGeometry, enemyMaterial);
+                enemy.position.copy(spawnPoint);
+                enemy.castShadow = true;
+                
+                // Add enemy properties
+                enemy.health = 100;
+                enemy.speed = 2;
+                enemy.lastShot = 0;
+                enemy.target = this.engine.camera.position;
+                
+                this.engine.scene.add(enemy);
+                this.enemies.push(enemy);
+                
+                // Add physics body
+                if (this.engine.physics) {
+                    this.engine.physics.addBody(enemy, 1, 'dynamic');
+                }
+            }
+            
+            shootBullet() {
+                if (this.gameState.ammo <= 0) return;
+                
+                this.gameState.ammo--;
+                this.updateHUD();
+                
+                // Create bullet
+                const bulletGeometry = new THREE.SphereGeometry(0.05, 4, 4);
+                const bulletMaterial = new THREE.MeshBasicMaterial({ color: 0xffff00 });
+                const bullet = new THREE.Mesh(bulletGeometry, bulletMaterial);
+                
+                // Position at camera
+                bullet.position.copy(this.engine.camera.position);
+                
+                // Set direction
+                const direction = new THREE.Vector3();
+                this.engine.camera.getWorldDirection(direction);
+                bullet.velocity = direction.multiplyScalar(50);
+                bullet.life = 2; // 2 seconds
+                
+                this.engine.scene.add(bullet);
+                this.bullets.push(bullet);
+                
+                // Weapon recoil animation
+                this.weapon.rotation.x = -0.1;
+                setTimeout(() => {
+                    this.weapon.rotation.x = 0;
+                }, 100);
+            }
+            
+            useTechnique() {
+                if (!this.gameState.techniqueReady) return;
+                
+                this.gameState.techniqueReady = false;
+                
+                // Domain Expansion effect
+                const expansionRadius = 20;
+                const expansionGeometry = new THREE.SphereGeometry(expansionRadius, 16, 16);
+                const expansionMaterial = new THREE.MeshBasicMaterial({
+                    color: 0x7c3aed,
+                    transparent: true,
+                    opacity: 0.3,
+                    wireframe: true
+                });
+                
+                const domain = new THREE.Mesh(expansionGeometry, expansionMaterial);
+                domain.position.copy(this.engine.camera.position);
+                this.engine.scene.add(domain);
+                
+                // Damage all enemies in range
+                this.enemies.forEach(enemy => {
+                    const distance = enemy.position.distanceTo(this.engine.camera.position);
+                    if (distance < expansionRadius) {
+                        enemy.health -= 200; // Massive damage
+                    }
+                });
+                
+                // Remove domain after effect
+                setTimeout(() => {
+                    this.engine.scene.remove(domain);
+                    this.gameState.techniqueReady = true;
+                }, 2000);
+            }
+            
+            update(deltaTime) {
+                if (!this.isPlaying) return;
+                
+                this.updateMovement(deltaTime);
+                this.updateEnemies(deltaTime);
+                this.updateBullets(deltaTime);
+                this.checkCollisions();
+                this.spawnEnemiesIfNeeded();
+            }
+            
+            updateMovement(deltaTime) {
+                const speed = this.movement.sprint ? 10 : 5;
+                
+                this.velocity.x -= this.velocity.x * 10.0 * deltaTime;
+                this.velocity.z -= this.velocity.z * 10.0 * deltaTime;
+                
+                this.direction.z = Number(this.movement.forward) - Number(this.movement.backward);
+                this.direction.x = Number(this.movement.right) - Number(this.movement.left);
+                this.direction.normalize();
+                
+                if (this.movement.forward || this.movement.backward) {
+                    this.velocity.z -= this.direction.z * speed * deltaTime;
+                }
+                if (this.movement.left || this.movement.right) {
+                    this.velocity.x -= this.direction.x * speed * deltaTime;
+                }
+                
+                this.controls.moveRight(-this.velocity.x * deltaTime);
+                this.controls.moveForward(-this.velocity.z * deltaTime);
+            }
+            
+            updateEnemies(deltaTime) {
+                this.enemies.forEach((enemy, index) => {
+                    if (enemy.health <= 0) {
+                        this.engine.scene.remove(enemy);
+                        this.enemies.splice(index, 1);
+                        this.gameState.score += 100;
+                        this.gameState.kills++;
+                        this.updateHUD();
+                        return;
+                    }
+                    
+                    // Move towards player
+                    const direction = new THREE.Vector3()
+                        .subVectors(this.engine.camera.position, enemy.position)
+                        .normalize();
+                    
+                    enemy.position.add(direction.multiplyScalar(enemy.speed * deltaTime));
+                    
+                    // Look at player
+                    enemy.lookAt(this.engine.camera.position);
+                    
+                    // Shoot at player occasionally
+                    const now = Date.now();
+                    if (now - enemy.lastShot > 2000) {
+                        enemy.lastShot = now;
+                        // Enemy shooting logic would go here
+                    }
+                });
+            }
+            
+            updateBullets(deltaTime) {
+                this.bullets.forEach((bullet, index) => {
+                    bullet.position.add(bullet.velocity.clone().multiplyScalar(deltaTime));
+                    bullet.life -= deltaTime;
+                    
+                    if (bullet.life <= 0) {
+                        this.engine.scene.remove(bullet);
+                        this.bullets.splice(index, 1);
+                    }
+                });
+            }
+            
+            checkCollisions() {
+                // Bullet-enemy collisions
+                this.bullets.forEach((bullet, bulletIndex) => {
+                    this.enemies.forEach((enemy, enemyIndex) => {
+                        const distance = bullet.position.distanceTo(enemy.position);
+                        if (distance < 1) {
+                            // Hit!
+                            enemy.health -= 50;
+                            this.engine.scene.remove(bullet);
+                            this.bullets.splice(bulletIndex, 1);
+                            
+                            // Hit effect
+                            const hitEffect = new THREE.Mesh(
+                                new THREE.SphereGeometry(0.5, 8, 8),
+                                new THREE.MeshBasicMaterial({
+                                    color: 0xff0000,
+                                    transparent: true,
+                                    opacity: 0.8
+                                })
+                            );
+                            hitEffect.position.copy(enemy.position);
+                            this.engine.scene.add(hitEffect);
+                            
+                            setTimeout(() => {
+                                this.engine.scene.remove(hitEffect);
+                            }, 200);
+                        }
+                    });
+                });
+                
+                // Enemy-player collisions
+                this.enemies.forEach(enemy => {
+                    const distance = enemy.position.distanceTo(this.engine.camera.position);
+                    if (distance < 2) {
+                        this.gameState.health -= 10;
+                        this.updateHUD();
+                        
+                        if (this.gameState.health <= 0) {
+                            this.gameOver();
+                        }
+                    }
+                });
+            }
+            
+            spawnEnemiesIfNeeded() {
+                if (this.enemies.length < 5 && Math.random() < 0.01) {
+                    this.spawnEnemy();
+                }
+            }
+            
+            setupEventListeners() {
+                // Keyboard controls
+                document.addEventListener('keydown', (e) => {
+                    switch (e.code) {
+                        case 'KeyW': this.movement.forward = true; break;
+                        case 'KeyS': this.movement.backward = true; break;
+                        case 'KeyA': this.movement.left = true; break;
+                        case 'KeyD': this.movement.right = true; break;
+                        case 'Space': 
+                            e.preventDefault();
+                            this.movement.jump = true; 
+                            break;
+                        case 'ShiftLeft': this.movement.sprint = true; break;
+                        case 'KeyR': this.reload(); break;
+                        case 'KeyE': this.useTechnique(); break;
+                    }
+                });
+                
+                document.addEventListener('keyup', (e) => {
+                    switch (e.code) {
+                        case 'KeyW': this.movement.forward = false; break;
+                        case 'KeyS': this.movement.backward = false; break;
+                        case 'KeyA': this.movement.left = false; break;
+                        case 'KeyD': this.movement.right = false; break;
+                        case 'Space': this.movement.jump = false; break;
+                        case 'ShiftLeft': this.movement.sprint = false; break;
+                    }
+                });
+                
+                // Mouse controls
+                document.addEventListener('click', () => {
+                    if (this.isPlaying) {
+                        this.shootBullet();
+                    }
+                });
+                
+                // Pointer lock
+                document.addEventListener('click', () => {
+                    if (this.isPlaying && !document.pointerLockElement) {
+                        this.controls.lock();
+                    }
+                });
+            }
+            
+            reload() {
+                if (this.gameState.ammo < 30 && this.gameState.maxAmmo > 0) {
+                    const reloadAmount = Math.min(30 - this.gameState.ammo, this.gameState.maxAmmo);
+                    this.gameState.ammo += reloadAmount;
+                    this.gameState.maxAmmo -= reloadAmount;
+                    this.updateHUD();
+                }
+            }
+            
+            updateHUD() {
+                document.getElementById('health-fill').style.width = this.gameState.health + '%';
+                document.getElementById('ammo').textContent = `${this.gameState.ammo}/${this.gameState.maxAmmo}`;
+                document.getElementById('score-value').textContent = this.gameState.score;
+                document.getElementById('technique').textContent = this.gameState.techniqueReady ? 'Ready' : 'Charging...';
+            }
+            
+            gameOver() {
+                this.isPlaying = false;
+                this.controls.unlock();
+                
+                // Save stats
+                this.saveGameStats();
+                
+                // Show game over screen
+                document.getElementById('menu').classList.remove('hidden');
+                document.getElementById('hud').classList.add('hidden');
+                document.getElementById('crosshair').classList.add('hidden');
+                document.getElementById('score').classList.add('hidden');
+                document.getElementById('instructions').classList.add('hidden');
+                
+                document.querySelector('.menu-title').textContent = 'MISSION FAILED';
+                document.querySelector('.menu-btn').textContent = 'TRY AGAIN';
+            }
+            
+            async saveGameStats() {
+                try {
+                    const playtime = Math.floor((Date.now() - this.startTime) / 1000);
+                    const stats = {
+                        score: this.gameState.score,
+                        won: this.gameState.score > 1000,
+                        playtime_seconds: playtime,
+                        extra: {
+                            kills: this.gameState.kills,
+                            accuracy: 85, // Calculate based on shots fired vs hits
+                            technique_used: this.gameState.technique
+                        }
+                    };
+                    
+                    if (window.NexusDB) {
+                        await NexusDB.saveStats('hunters', stats);
+                    }
+                } catch (error) {
+                    console.error('Failed to save stats:', error);
+                }
+            }
+        }
+        
+        let game = null;
+        
+        async function startGame() {
+            document.getElementById('menu').classList.add('hidden');
+            document.getElementById('hud').classList.remove('hidden');
+            document.getElementById('crosshair').classList.remove('hidden');
+            document.getElementById('score').classList.remove('hidden');
+            document.getElementById('instructions').classList.remove('hidden');
+            
+            if (!game) {
+                game = new Hunters3D();
+            }
+            
+            game.isPlaying = true;
+            game.startTime = Date.now();
+            game.controls.lock();
+            
+            // Spawn initial enemies
+            for (let i = 0; i < 3; i++) {
+                setTimeout(() => game.spawnEnemy(), i * 1000);
+            }
+        }
+        
+        function showMultiplayer() {
+            window.location.href = '/multiplayer-lobby.html?game=hunters';
+        }
+        
+        function showSettings() {
+            alert('Settings coming soon!');
+        }
+        
+        // Initialize when page loads
+        window.addEventListener('load', () => {
+            // Check for room parameter (multiplayer)
+            const params = new URLSearchParams(window.location.search);
+            if (params.get('room')) {
+                // Auto-start multiplayer
+                startGame();
+            }
+        });
+    </script>
+</body>
+</html>

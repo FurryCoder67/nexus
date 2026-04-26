@@ -831,6 +831,7 @@
     }
 
     .game-card:hover .thumb-play-btn { bottom: 10px; }
+    .game-card:hover .multiplayer-btn { bottom: -30px; }
 
     .new-badge {
       position: absolute;
@@ -1313,6 +1314,11 @@
       .nav-search { display: none; }
     }
   </style>
+  <!-- Supabase and Nexus Cloud Scripts -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <script src="games/nexus-config.js"></script>
+  <script src="games/nexus-auth.js"></script>
+  <script src="games/nexus-db.js"></script>
 </head>
 <body>
 
@@ -1368,12 +1374,12 @@
     </div>
 
     <div class="nav-avatar" id="avatar-btn" title="Profile">
-      A
+      <span id="nav-user-initial">?</span>
       <div class="avatar-dropdown" id="avatar-dropdown">
-        <div class="avatar-dd-item">👤 Profile</div>
+        <div class="avatar-dd-item" onclick="window.location.href='/profile.html'">👤 Profile</div>
         <div class="avatar-dd-item">⚙️ Settings</div>
         <div class="avatar-dd-item">🏆 My Achievements</div>
-        <div class="avatar-dd-item danger">🚪 Sign Out</div>
+        <div class="avatar-dd-item danger" onclick="signOut()">🚪 Sign Out</div>
       </div>
     </div>
 
@@ -1458,15 +1464,15 @@
       </div>
       <div class="featured-content">
         <div class="featured-label">⚡ Featured Game</div>
-        <div class="featured-title">HUNTERS</div>
-        <div class="featured-desc">JJK-themed FPS — battle cursed spirits with powerful techniques, domain expansion and cursed energy combat.</div>
+        <div class="featured-title">HUNTERS 3D</div>
+        <div class="featured-desc">Enhanced 3D JJK-themed FPS — battle cursed spirits with powerful techniques, domain expansion and cursed energy combat in immersive 3D environments.</div>
         <div class="featured-players">
           <div class="online-dot"></div>
           1,247 playing now
         </div>
         <div class="featured-actions">
-          <button class="btn-primary" onclick="navigateToGame('games/jujutsuhunters/hunters.html')">▶ PLAY NOW</button>
-          <button class="btn-outline">ℹ GAME INFO</button>
+          <button class="btn-primary" onclick="navigateToGame('games/hunters-3d/index.html')">▶ PLAY NOW</button>
+          <button class="btn-outline multiplayer-btn" onclick="navigateToGame('games/hunters-3d/index.html')">👥 MULTIPLAYER</button>
         </div>
       </div>
       <div class="featured-symbol">
@@ -1483,44 +1489,45 @@
       <a class="section-see-all" href="#">See all</a>
     </div>
     <div class="scroll-row" id="continue-row">
-      <div class="game-card continue-card" data-game="hunters" onclick="navigateToGame('games/jujutsuhunters/hunters.html')">
+      <div class="game-card continue-card" data-game="hunters" onclick="navigateToGame('games/hunters-3d/index.html')">
         <div class="continue-thumb thumb-hunters game-thumb">
           <div class="thumb-glyph">⚔️</div>
           <div class="thumb-overlay"></div>
-          <button class="thumb-play-btn">▶ PLAY</button>
+          <button class="thumb-play-btn" onclick="navigateToGame('games/hunters-3d/index.html')">▶ PLAY</button>
+          <button class="thumb-play-btn multiplayer-btn" onclick="navigateToGame('games/hunters-3d/index.html')" style="bottom: -80px; background: linear-gradient(135deg, #06b6d4, #0891b2);">👥 MULTIPLAYER</button>
         </div>
         <div class="game-card-body">
-          <div class="game-name">HUNTERS</div>
+          <div class="game-name">HUNTERS 3D</div>
           <div class="game-meta">
-            <span class="game-genre">FPS Combat</span>
+            <span class="game-genre">3D FPS Combat</span>
             <span class="game-rating">⭐ 4.9</span>
           </div>
         </div>
       </div>
-      <div class="game-card continue-card" data-game="cursed-arena" onclick="navigateToGame('games/cursed-arena/index.html')">
+      <div class="game-card continue-card" data-game="cursed-arena" onclick="navigateToGame('games/cursed-arena-3d/index.html')">
         <div class="continue-thumb thumb-arena game-thumb">
           <div class="thumb-glyph">🌀</div>
           <div class="thumb-overlay"></div>
           <button class="thumb-play-btn">▶ PLAY</button>
         </div>
         <div class="game-card-body">
-          <div class="game-name">Cursed Arena</div>
+          <div class="game-name">Cursed Arena 3D</div>
           <div class="game-meta">
-            <span class="game-genre">Top-Down</span>
+            <span class="game-genre">3D Arena Combat</span>
             <span class="game-rating">⭐ 4.7</span>
           </div>
         </div>
       </div>
-      <div class="game-card continue-card" data-game="domain-defender" onclick="navigateToGame('games/domain-defender/index.html')">
+      <div class="game-card continue-card" data-game="domain-defender" onclick="navigateToGame('games/domain-defender-3d/index.html')">
         <div class="continue-thumb thumb-defender game-thumb">
           <div class="thumb-glyph">🏯</div>
           <div class="thumb-overlay"></div>
           <button class="thumb-play-btn">▶ PLAY</button>
         </div>
         <div class="game-card-body">
-          <div class="game-name">Domain Defender</div>
+          <div class="game-name">Domain Defender 3D</div>
           <div class="game-meta">
-            <span class="game-genre">Tower Defense</span>
+            <span class="game-genre">3D Tower Defense</span>
             <span class="game-rating">⭐ 4.6</span>
           </div>
         </div>
@@ -1534,87 +1541,87 @@
     </div>
     <div class="games-grid" id="games-grid">
 
-      <div class="game-card grid-card" data-game="hunters" data-name="HUNTERS" onclick="navigateToGame('games/jujutsuhunters/hunters.html')">
+      <div class="game-card grid-card" data-game="hunters" data-name="HUNTERS" onclick="navigateToGame('games/hunters-3d/index.html')">
         <div class="game-thumb thumb-hunters">
           <div class="thumb-glyph">⚔️</div>
           <div class="thumb-overlay"></div>
           <button class="thumb-play-btn">▶ PLAY</button>
         </div>
         <div class="game-card-body">
-          <div class="game-name">HUNTERS</div>
+          <div class="game-name">HUNTERS 3D</div>
           <div class="game-meta">
-            <span class="game-genre">FPS Combat</span>
+            <span class="game-genre">3D FPS Combat</span>
             <span class="game-players"><div class="online-dot"></div>1,247</span>
             <span class="game-rating">⭐4.9</span>
           </div>
         </div>
       </div>
 
-      <div class="game-card grid-card" data-game="cursed-arena" data-name="Cursed Arena" onclick="navigateToGame('games/cursed-arena/index.html')">
+      <div class="game-card grid-card" data-game="cursed-arena" data-name="Cursed Arena" onclick="navigateToGame('games/cursed-arena-3d/index.html')">
         <div class="game-thumb thumb-arena">
           <div class="thumb-glyph">🌀</div>
           <div class="thumb-overlay"></div>
           <button class="thumb-play-btn">▶ PLAY</button>
         </div>
         <div class="game-card-body">
-          <div class="game-name">Cursed Arena</div>
+          <div class="game-name">Cursed Arena 3D</div>
           <div class="game-meta">
-            <span class="game-genre">Top-Down Shooter</span>
+            <span class="game-genre">3D Arena Combat</span>
             <span class="game-players"><div class="online-dot"></div>892</span>
             <span class="game-rating">⭐4.7</span>
           </div>
         </div>
       </div>
 
-      <div class="game-card grid-card" data-game="domain-defender" data-name="Domain Defender" onclick="navigateToGame('games/domain-defender/index.html')">
+      <div class="game-card grid-card" data-game="domain-defender" data-name="Domain Defender" onclick="navigateToGame('games/domain-defender-3d/index.html')">
         <div class="game-thumb thumb-defender">
           <div class="thumb-glyph">🏯</div>
           <div class="thumb-overlay"></div>
           <button class="thumb-play-btn">▶ PLAY</button>
         </div>
         <div class="game-card-body">
-          <div class="game-name">Domain Defender</div>
+          <div class="game-name">Domain Defender 3D</div>
           <div class="game-meta">
-            <span class="game-genre">Tower Defense</span>
+            <span class="game-genre">3D Tower Defense</span>
             <span class="game-players"><div class="online-dot"></div>634</span>
             <span class="game-rating">⭐4.6</span>
           </div>
         </div>
       </div>
 
-      <div class="game-card grid-card" data-game="grade-trials" data-name="Grade Trials" onclick="navigateToGame('games/grade-trials/index.html')">
+      <div class="game-card grid-card" data-game="grade-trials" data-name="Grade Trials" onclick="navigateToGame('games/grade-trials-3d/index.html')">
         <div class="game-thumb thumb-trials">
           <div class="thumb-glyph">🎵</div>
           <div class="thumb-overlay"></div>
           <button class="thumb-play-btn">▶ PLAY</button>
         </div>
         <div class="game-card-body">
-          <div class="game-name">Grade Trials</div>
+          <div class="game-name">Grade Trials 3D</div>
           <div class="game-meta">
-            <span class="game-genre">Rhythm Combat</span>
+            <span class="game-genre">3D Rhythm Combat</span>
             <span class="game-players"><div class="online-dot"></div>418</span>
             <span class="game-rating">⭐4.5</span>
           </div>
         </div>
       </div>
 
-      <div class="game-card grid-card" data-game="spirit-chase" data-name="Spirit Chase" onclick="navigateToGame('games/spirit-chase/index.html')">
+      <div class="game-card grid-card" data-game="spirit-chase" data-name="Spirit Chase" onclick="navigateToGame('games/spirit-chase-3d/index.html')">
         <div class="game-thumb thumb-spirit">
           <div class="thumb-glyph">👻</div>
           <div class="thumb-overlay"></div>
           <button class="thumb-play-btn">▶ PLAY</button>
         </div>
         <div class="game-card-body">
-          <div class="game-name">Spirit Chase</div>
+          <div class="game-name">Spirit Chase 3D</div>
           <div class="game-meta">
-            <span class="game-genre">Horror Survival</span>
+            <span class="game-genre">3D Horror Survival</span>
             <span class="game-players"><div class="online-dot"></div>287</span>
             <span class="game-rating">⭐4.4</span>
           </div>
         </div>
       </div>
 
-      <div class="game-card grid-card" data-game="culling-colony" data-name="Culling Colony" onclick="navigateToGame('games/culling-colony/index.html')">
+      <div class="game-card grid-card" data-game="culling-colony" data-name="Culling Colony" onclick="navigateToGame('games/culling-colony-3d/index.html')">
         <div class="game-thumb thumb-culling">
           <div class="thumb-glyph">💀</div>
           <div class="thumb-overlay"></div>
@@ -1718,7 +1725,7 @@
       <a class="section-see-all" href="#">See all</a>
     </div>
     <div class="scroll-row">
-      <div class="game-card continue-card" data-name="Grade Trials" onclick="navigateToGame('games/grade-trials/index.html')">
+      <div class="game-card continue-card" data-name="Grade Trials" onclick="navigateToGame('games/grade-trials-3d/index.html')">
         <div class="continue-thumb thumb-trials game-thumb">
           <div class="thumb-glyph">🎵</div>
           <div class="new-badge">NEW</div>
@@ -1730,7 +1737,7 @@
           <div class="game-meta"><span class="game-genre">Rhythm Combat</span><span class="game-rating">⭐4.5</span></div>
         </div>
       </div>
-      <div class="game-card continue-card" data-name="Spirit Chase" onclick="navigateToGame('games/spirit-chase/index.html')">
+      <div class="game-card continue-card" data-name="Spirit Chase" onclick="navigateToGame('games/spirit-chase-3d/index.html')">
         <div class="continue-thumb thumb-spirit game-thumb">
           <div class="thumb-glyph">👻</div>
           <div class="new-badge">NEW</div>
@@ -1742,7 +1749,7 @@
           <div class="game-meta"><span class="game-genre">Horror Survival</span><span class="game-rating">⭐4.4</span></div>
         </div>
       </div>
-      <div class="game-card continue-card" data-name="Culling Colony" onclick="navigateToGame('games/culling-colony/index.html')">
+      <div class="game-card continue-card" data-name="Culling Colony" onclick="navigateToGame('games/culling-colony-3d/index.html')">
         <div class="continue-thumb thumb-culling game-thumb">
           <div class="thumb-glyph">💀</div>
           <div class="new-badge">NEW</div>
@@ -2171,7 +2178,42 @@ function navigateToGame(url) {
     setTimeout(() => toast.remove(), 2500);
     return;
   }
+  
+  // Check if user wants multiplayer (shift+click or dedicated multiplayer button)
+  if (event && (event.shiftKey || event.target.classList.contains('multiplayer-btn'))) {
+    // Extract game ID from URL
+    const gameId = extractGameId(url);
+    if (gameId) {
+      window.location.href = `/multiplayer-lobby.html?game=${gameId}`;
+      return;
+    }
+  }
+  
   window.location.href = url;
+}
+
+// Extract game ID from game URL
+function extractGameId(url) {
+  const gameMap = {
+    'games/jujutsuhunters/hunters.html': 'hunters',
+    'games/cursed-arena/index.html': 'cursed-arena',
+    'games/domain-defender/index.html': 'domain-defender',
+    'games/grade-trials/index.html': 'grade-trials',
+    'games/spirit-chase/index.html': 'spirit-chase',
+    'games/culling-colony/index.html': 'culling-colony'
+  };
+  return gameMap[url] || null;
+}
+
+// Sign out function
+async function signOut() {
+  try {
+    await NexusAuth.signOut();
+  } catch (error) {
+    console.error('Sign out error:', error);
+    // Fallback: redirect to home
+    window.location.href = '/';
+  }
 }
 
 // Slide-up animation for toast
@@ -2180,7 +2222,7 @@ style.textContent = `@keyframes slideUp { from { opacity:0; transform:translateX
 document.head.appendChild(style);
 
 // ══════════════════════════════════════════
-//  DYNAMIC STATS FROM LOCALSTORAGE
+//  DYNAMIC STATS FROM CLOUD DATABASE
 // ══════════════════════════════════════════
 (function () {
   // Base play counts (seeded so new installs aren't empty)
@@ -2254,6 +2296,84 @@ document.head.appendChild(style);
     featuredPlayers.innerHTML = `<div class="online-dot"></div>${fmt(huntersPlays)} playing now`;
   }
 })();
+
+// ══════════════════════════════════════════
+//  CLOUD INTEGRATION
+// ══════════════════════════════════════════
+document.addEventListener('DOMContentLoaded', async function() {
+  // Initialize authentication
+  try {
+    const user = await NexusAuth.getUser();
+    if (user) {
+      await loadUserProfile();
+      await loadGlobalLeaderboard();
+    } else {
+      // Show sign in prompt in avatar
+      document.getElementById('nav-user-initial').textContent = '?';
+      document.getElementById('avatar-btn').onclick = () => {
+        window.location.href = '/login.html?returnTo=' + encodeURIComponent(window.location.href);
+      };
+    }
+  } catch (error) {
+    console.log('Not signed in or auth error:', error);
+  }
+});
+
+// Load user profile data
+async function loadUserProfile() {
+  try {
+    const profile = await NexusAuth.getProfile();
+    if (profile) {
+      document.getElementById('nav-user-initial').textContent = profile.display_name.charAt(0).toUpperCase();
+      
+      // Update coins display with XP
+      const coinsEl = document.querySelector('.nav-coins span');
+      if (coinsEl) {
+        coinsEl.textContent = profile.xp.toLocaleString();
+      }
+    }
+  } catch (error) {
+    console.error('Failed to load user profile:', error);
+  }
+}
+
+// Load global leaderboard
+async function loadGlobalLeaderboard() {
+  try {
+    const leaderboard = await NexusDB.getGlobalLeaderboard(10);
+    updateLeaderboardDisplay(leaderboard);
+  } catch (error) {
+    console.error('Failed to load global leaderboard:', error);
+  }
+}
+
+// Update leaderboard display
+function updateLeaderboardDisplay(leaderboard) {
+  const tbody = document.querySelector('.leaderboard-table tbody');
+  if (!tbody || !leaderboard) return;
+  
+  tbody.innerHTML = leaderboard.slice(0, 10).map((player, index) => {
+    const rankClass = index === 0 ? 'rank-1' : index === 1 ? 'rank-2' : index === 2 ? 'rank-3' : 'rank-other';
+    const avatar = player.avatarUrl ? 
+      `<img src="${player.avatarUrl}" alt="${player.displayName}" style="width:26px;height:26px;border-radius:50%;object-fit:cover;">` :
+      `<div class="player-mini-avatar" style="background:linear-gradient(135deg,#7c3aed,#06b6d4)">${player.displayName.charAt(0)}</div>`;
+    
+    return `
+      <tr>
+        <td><span class="rank-badge ${rankClass}">${player.rank}</span></td>
+        <td>
+          <div class="player-cell">
+            ${avatar}
+            <span>${player.displayName}</span>
+          </div>
+        </td>
+        <td>Level ${player.level}</td>
+        <td>${player.totalWins}</td>
+        <td class="coin-earned">${player.xp.toLocaleString()}</td>
+      </tr>
+    `;
+  }).join('');
+}
 </script>
 </body>
 </html>

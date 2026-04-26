@@ -1,0 +1,697 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GRADE TRIALS 3D — NEXUS</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            background: #000;
+            color: #fff;
+            font-family: 'Segoe UI', sans-serif;
+            overflow: hidden;
+            user-select: none;
+        }
+        #gameContainer {
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+        }
+        #ui {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            pointer-events: none;
+            z-index: 100;
+        }
+        #hud {
+            position: absolute;
+            top: 20px; left: 20px;
+            pointer-events: all;
+        }
+        .hud-panel {
+            background: rgba(0,0,0,0.8);
+            border: 1px solid #22c55e;
+            border-radius: 8px;
+            padding: 12px;
+            margin-bottom: 10px;
+            backdrop-filter: blur(10px);
+        }
+        #rhythm-bar {
+            width: 300px;
+            height: 30px;
+            background: rgba(34, 197, 94, 0.3);
+            border-radius: 15px;
+            overflow: hidden;
+            position: relative;
+        }
+        #rhythm-indicator {
+            position: absolute;
+            left: 50%;
+            top: 0;
+            width: 4px;
+            height: 100%;
+            background: #fff;
+            transform: translateX(-50%);
+        }
+        .note {
+            position: absolute;
+            width: 20px;
+            height: 20px;
+            background: #22c55e;
+            border-radius: 50%;
+            top: 5px;
+            transition: left 0.1s linear;
+        }
+        #menu {
+            position: absolute;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0,0,0,0.9);
+            border: 2px solid #22c55e;
+            border-radius: 12px;
+            padding: 40px;
+            text-align: center;
+            pointer-events: all;
+        }
+        .menu-title {
+            font-size: 48px;
+            font-weight: 900;
+            color: #22c55e;
+            margin-bottom: 20px;
+            text-shadow: 0 0 20px #22c55e;
+        }
+        .menu-btn {
+            display: block;
+            width: 200px;
+            padding: 15px;
+            margin: 10px auto;
+            background: linear-gradient(135deg, #22c55e, #16a34a);
+            border: none;
+            border-radius: 8px;
+            color: white;
+            font-size: 16px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        .menu-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(34, 197, 94, 0.5);
+        }
+        #game-info {
+            position: absolute;
+            top: 20px; right: 20px;
+            text-align: right;
+            font-size: 18px;
+            color: #22c55e;
+        }
+        #stage-display {
+            position: absolute;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 72px;
+            font-weight: 900;
+            color: #22c55e;
+            text-shadow: 0 0 30px #22c55e;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.5s ease;
+        }
+        .hidden { display: none !important; }
+    </style>
+</head>
+<body>
+    <div id="gameContainer"></div>
+    
+    <div id="ui">
+        <div id="hud" class="hidden">
+            <div class="hud-panel">
+                <div>Rhythm Sync</div>
+                <div id="rhythm-bar">
+                    <div id="rhythm-indicator"></div>
+                </div>
+            </div>
+            <div class="hud-panel">
+                <div>Combo: <span id="combo">0x</span></div>
+                <div>Accuracy: <span id="accuracy">100%</span></div>
+            </div>
+        </div>
+        
+        <div id="game-info" class="hidden">
+            <div>Grade: <span id="current-grade">4th</span></div>
+            <div>Score: <span id="score">0</span></div>
+            <div>Progress: <span id="progress">0/100</span></div>
+        </div>
+        
+        <div id="stage-display"></div>
+        
+        <div id="menu">
+            <div class="menu-title">GRADE TRIALS 3D</div>
+            <button class="menu-btn" onclick="startGame()">BEGIN TRIALS</button>
+            <button class="menu-btn" onclick="showMultiplayer()">MULTIPLAYER</button>
+            <button class="menu-btn" onclick="showGrades()">GRADE SYSTEM</button>
+            <button class="menu-btn" onclick="window.location.href='/'">BACK TO NEXUS</button>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="../nexus-3d-engine.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+    <script src="../nexus-config.js"></script>
+    <script src="../nexus-auth.js"></script>
+    <script src="../nexus-cloud.js"></script>
+    <script src="../nexus-db.js"></script>
+    
+    <script>
+        class GradeTrials3D {
+            constructor() {
+                this.engine = null;
+                this.arena = null;
+                this.targets = [];
+                this.effects = [];
+                this.notes = [];
+                
+                this.gameState = {
+                    grade: 4,
+                    score: 0,
+                    combo: 0,
+                    accuracy: 100,
+                    progress: 0,
+                    targetProgress: 100,
+                    hits: 0,
+                    totalNotes: 0
+                };
+                
+                this.isPlaying = false;
+                this.startTime = 0;
+                this.lastBeat = 0;
+                this.beatInterval = 600; // ms between beats
+                this.currentSong = null;
+                
+                this.grades = {
+                    4: { name: '4th Grade', color: 0x22c55e, speed: 1.0, targetCount: 100 },
+                    3: { name: '3rd Grade', color: 0x3b82f6, speed: 1.2, targetCount: 150 },
+                    2: { name: '2nd Grade', color: 0x8b5cf6, speed: 1.4, targetCount: 200 },
+                    1: { name: '1st Grade', color: 0xf59e0b, speed: 1.6, targetCount: 250 },
+                    'special': { name: 'Special Grade', color: 0xef4444, speed: 2.0, targetCount: 300 }
+                };
+                
+                this.init();
+            }
+            
+            async init() {
+                this.engine = new Nexus3D('gameContainer', {
+                    shadows: true,
+                    fog: false,
+                    postProcessing: true,
+                    physics: false
+                });
+                
+                await new Promise(resolve => {
+                    const checkEngine = () => {
+                        if (this.engine.scene) {
+                            resolve();
+                        } else {
+                            setTimeout(checkEngine, 100);
+                        }
+                    };
+                    checkEngine();
+                });
+                
+                this.createArena();
+                this.setupCamera();
+                this.setupEventListeners();
+                this.createAudioContext();
+                
+                this.engine.onUpdate = (deltaTime) => this.update(deltaTime);
+            }
+            
+            createArena() {
+                // Create circular arena
+                const arenaRadius = 20;
+                const arenaGeometry = new THREE.CylinderGeometry(arenaRadius, arenaRadius, 1, 32);
+                const arenaMaterial = new THREE.MeshStandardMaterial({
+                    color: 0x1a1a2e,
+                    roughness: 0.8,
+                    metalness: 0.2
+                });
+                
+                this.arena = new THREE.Mesh(arenaGeometry, arenaMaterial);
+                this.arena.receiveShadow = true;
+                this.engine.scene.add(this.arena);
+                
+                // Create grade platforms
+                this.createGradePlatforms();
+                
+                // Add rhythm visualization
+                this.createRhythmVisualization();
+                
+                // Add atmospheric effects
+                this.createAtmosphere();
+            }
+            
+            createGradePlatforms() {
+                const platformCount = 5;
+                const radius = 15;
+                
+                Object.keys(this.grades).forEach((grade, index) => {
+                    const angle = (index / platformCount) * Math.PI * 2;
+                    const x = Math.cos(angle) * radius;
+                    const z = Math.sin(angle) * radius;
+                    
+                    const platform = new THREE.Mesh(
+                        new THREE.CylinderGeometry(2, 2, 0.5, 8),
+                        new THREE.MeshStandardMaterial({
+                            color: this.grades[grade].color,
+                            emissive: new THREE.Color(this.grades[grade].color).multiplyScalar(0.1)
+                        })
+                    );
+                    
+                    platform.position.set(x, 0.25, z);
+                    platform.castShadow = true;
+                    platform.receiveShadow = true;
+                    this.engine.scene.add(platform);
+                    
+                    // Add grade label
+                    const labelGeometry = new THREE.PlaneGeometry(2, 0.5);
+                    const labelMaterial = new THREE.MeshBasicMaterial({
+                        color: this.grades[grade].color,
+                        transparent: true,
+                        opacity: 0.8
+                    });
+                    
+                    const label = new THREE.Mesh(labelGeometry, labelMaterial);
+                    label.position.set(x, 2, z);
+                    label.lookAt(0, 2, 0);
+                    this.engine.scene.add(label);
+                });
+            }
+            
+            createRhythmVisualization() {
+                // Create central rhythm core
+                const coreGeometry = new THREE.SphereGeometry(2, 16, 16);
+                const coreMaterial = new THREE.MeshBasicMaterial({
+                    color: 0x22c55e,
+                    transparent: true,
+                    opacity: 0.6,
+                    wireframe: true
+                });
+                
+                this.rhythmCore = new THREE.Mesh(coreGeometry, coreMaterial);
+                this.rhythmCore.position.set(0, 3, 0);
+                this.engine.scene.add(this.rhythmCore);
+                
+                // Create rhythm rings
+                this.rhythmRings = [];
+                for (let i = 0; i < 3; i++) {
+                    const ring = new THREE.Mesh(
+                        new THREE.TorusGeometry(3 + i * 2, 0.1, 8, 32),
+                        new THREE.MeshBasicMaterial({
+                            color: 0x22c55e,
+                            transparent: true,
+                            opacity: 0.4
+                        })
+                    );
+                    ring.position.set(0, 3, 0);
+                    ring.rotation.x = Math.PI / 2;
+                    this.engine.scene.add(ring);
+                    this.rhythmRings.push(ring);
+                }
+            }
+            
+            createAtmosphere() {
+                // Add particle system for rhythm effects
+                this.engine.createParticleSystem({
+                    count: 300,
+                    spread: 40,
+                    color: 0x22c55e,
+                    size: 0.2,
+                    opacity: 0.5
+                });
+                
+                // Add dynamic lighting
+                this.rhythmLight = new THREE.PointLight(0x22c55e, 1, 50);
+                this.rhythmLight.position.set(0, 10, 0);
+                this.engine.scene.add(this.rhythmLight);
+            }
+            
+            setupCamera() {
+                this.engine.camera.position.set(0, 25, 25);
+                this.engine.camera.lookAt(0, 0, 0);
+                
+                if (this.engine.controls) {
+                    this.engine.controls.enablePan = false;
+                    this.engine.controls.enableZoom = true;
+                    this.engine.controls.minDistance = 20;
+                    this.engine.controls.maxDistance = 40;
+                }
+            }
+            
+            createAudioContext() {
+                // Simple audio context for rhythm generation
+                try {
+                    this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                } catch (e) {
+                    console.warn('Audio context not available');
+                }
+            }
+            
+            playBeatSound(frequency = 440) {
+                if (!this.audioContext) return;
+                
+                const oscillator = this.audioContext.createOscillator();
+                const gainNode = this.audioContext.createGain();
+                
+                oscillator.connect(gainNode);
+                gainNode.connect(this.audioContext.destination);
+                
+                oscillator.frequency.setValueAtTime(frequency, this.audioContext.currentTime);
+                oscillator.type = 'sine';
+                
+                gainNode.gain.setValueAtTime(0.3, this.audioContext.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, this.audioContext.currentTime + 0.2);
+                
+                oscillator.start(this.audioContext.currentTime);
+                oscillator.stop(this.audioContext.currentTime + 0.2);
+            }
+            
+            setupEventListeners() {
+                // Rhythm input
+                document.addEventListener('keydown', (e) => {
+                    if (!this.isPlaying) return;
+                    
+                    switch (e.code) {
+                        case 'Space':
+                            e.preventDefault();
+                            this.hitRhythm();
+                            break;
+                        case 'KeyZ':
+                        case 'KeyX':
+                        case 'KeyC':
+                        case 'KeyV':
+                            this.hitRhythm();
+                            break;
+                    }
+                });
+                
+                // Mouse clicks for rhythm
+                document.addEventListener('click', () => {
+                    if (this.isPlaying) {
+                        this.hitRhythm();
+                    }
+                });
+            }
+            
+            hitRhythm() {
+                const now = Date.now();
+                const timeSinceLastBeat = now - this.lastBeat;
+                const beatTiming = timeSinceLastBeat % this.beatInterval;
+                const accuracy = Math.abs(beatTiming - this.beatInterval / 2) / (this.beatInterval / 2);
+                
+                let hitQuality = 'miss';
+                let points = 0;
+                
+                if (accuracy < 0.1) {
+                    hitQuality = 'perfect';
+                    points = 100;
+                    this.gameState.combo++;
+                } else if (accuracy < 0.3) {
+                    hitQuality = 'good';
+                    points = 75;
+                    this.gameState.combo++;
+                } else if (accuracy < 0.5) {
+                    hitQuality = 'ok';
+                    points = 50;
+                    this.gameState.combo = Math.max(0, this.gameState.combo - 1);
+                } else {
+                    hitQuality = 'miss';
+                    points = 0;
+                    this.gameState.combo = 0;
+                }
+                
+                // Apply combo multiplier
+                points *= Math.min(this.gameState.combo / 10 + 1, 3);
+                
+                this.gameState.score += Math.floor(points);
+                this.gameState.hits++;
+                this.gameState.totalNotes++;
+                this.gameState.progress++;
+                
+                // Update accuracy
+                this.gameState.accuracy = Math.floor((this.gameState.hits / this.gameState.totalNotes) * 100);
+                
+                // Create hit effect
+                this.createHitEffect(hitQuality);
+                
+                // Play sound
+                const frequencies = { perfect: 880, good: 660, ok: 440, miss: 220 };
+                this.playBeatSound(frequencies[hitQuality]);
+                
+                this.updateHUD();
+                this.checkGradeProgression();
+            }
+            
+            createHitEffect(quality) {
+                const colors = {
+                    perfect: 0xffd700,
+                    good: 0x22c55e,
+                    ok: 0xf59e0b,
+                    miss: 0xef4444
+                };
+                
+                const effect = new THREE.Mesh(
+                    new THREE.SphereGeometry(1, 8, 8),
+                    new THREE.MeshBasicMaterial({
+                        color: colors[quality],
+                        transparent: true,
+                        opacity: 0.8
+                    })
+                );
+                
+                effect.position.set(
+                    (Math.random() - 0.5) * 10,
+                    2 + Math.random() * 3,
+                    (Math.random() - 0.5) * 10
+                );
+                
+                this.engine.scene.add(effect);
+                this.effects.push(effect);
+                
+                // Animate effect
+                this.engine.animate(effect.scale, 'x', 2, 500);
+                this.engine.animate(effect.scale, 'y', 2, 500);
+                this.engine.animate(effect.scale, 'z', 2, 500);
+                this.engine.animate(effect.material, 'opacity', 0, 500);
+                
+                setTimeout(() => {
+                    this.engine.scene.remove(effect);
+                    const index = this.effects.indexOf(effect);
+                    if (index > -1) this.effects.splice(index, 1);
+                }, 500);
+            }
+            
+            checkGradeProgression() {
+                const currentGradeInfo = this.grades[this.gameState.grade];
+                
+                if (this.gameState.progress >= currentGradeInfo.targetCount) {
+                    this.promoteGrade();
+                }
+            }
+            
+            promoteGrade() {
+                const gradeOrder = [4, 3, 2, 1, 'special'];
+                const currentIndex = gradeOrder.indexOf(this.gameState.grade);
+                
+                if (currentIndex < gradeOrder.length - 1) {
+                    this.gameState.grade = gradeOrder[currentIndex + 1];
+                    this.gameState.progress = 0;
+                    
+                    // Update game speed and visuals
+                    const newGradeInfo = this.grades[this.gameState.grade];
+                    this.beatInterval = Math.floor(600 / newGradeInfo.speed);
+                    
+                    // Show grade promotion
+                    this.showGradePromotion();
+                    
+                    // Update arena color
+                    this.updateArenaColor(newGradeInfo.color);
+                } else {
+                    // Reached Special Grade - game complete
+                    this.gameComplete();
+                }
+            }
+            
+            showGradePromotion() {
+                const gradeInfo = this.grades[this.gameState.grade];
+                const display = document.getElementById('stage-display');
+                display.textContent = `${gradeInfo.name} ACHIEVED!`;
+                display.style.opacity = '1';
+                
+                setTimeout(() => {
+                    display.style.opacity = '0';
+                }, 3000);
+            }
+            
+            updateArenaColor(color) {
+                // Update rhythm core color
+                this.rhythmCore.material.color.setHex(color);
+                
+                // Update rhythm rings color
+                this.rhythmRings.forEach(ring => {
+                    ring.material.color.setHex(color);
+                });
+                
+                // Update lighting
+                this.rhythmLight.color.setHex(color);
+                
+                // Update particle system color
+                // Note: This would require recreating the particle system
+            }
+            
+            update(deltaTime) {
+                if (!this.isPlaying) return;
+                
+                this.updateRhythmVisualization(deltaTime);
+                this.generateRhythmBeats();
+                this.updateNotes(deltaTime);
+            }
+            
+            updateRhythmVisualization(deltaTime) {
+                // Rotate rhythm core
+                this.rhythmCore.rotation.y += deltaTime * 2;
+                
+                // Animate rhythm rings
+                this.rhythmRings.forEach((ring, index) => {
+                    ring.rotation.z += deltaTime * (1 + index * 0.5);
+                    
+                    // Pulse with beat
+                    const beatPhase = (Date.now() % this.beatInterval) / this.beatInterval;
+                    const scale = 1 + Math.sin(beatPhase * Math.PI * 2) * 0.1;
+                    ring.scale.setScalar(scale);
+                });
+                
+                // Pulse rhythm light
+                const beatPhase = (Date.now() % this.beatInterval) / this.beatInterval;
+                this.rhythmLight.intensity = 1 + Math.sin(beatPhase * Math.PI * 2) * 0.5;
+            }
+            
+            generateRhythmBeats() {
+                const now = Date.now();
+                
+                if (now - this.lastBeat >= this.beatInterval) {
+                    this.lastBeat = now;
+                    this.createRhythmNote();
+                }
+            }
+            
+            createRhythmNote() {
+                // Add note to UI rhythm bar
+                const note = document.createElement('div');
+                note.className = 'note';
+                note.style.left = '0px';
+                
+                const rhythmBar = document.getElementById('rhythm-bar');
+                rhythmBar.appendChild(note);
+                
+                this.notes.push({
+                    element: note,
+                    startTime: Date.now(),
+                    duration: this.beatInterval * 2
+                });
+            }
+            
+            updateNotes(deltaTime) {
+                const now = Date.now();
+                
+                this.notes.forEach((note, index) => {
+                    const elapsed = now - note.startTime;
+                    const progress = elapsed / note.duration;
+                    
+                    if (progress >= 1) {
+                        // Note missed
+                        note.element.remove();
+                        this.notes.splice(index, 1);
+                        this.gameState.totalNotes++;
+                        this.gameState.accuracy = Math.floor((this.gameState.hits / this.gameState.totalNotes) * 100);
+                        this.updateHUD();
+                    } else {
+                        // Move note across rhythm bar
+                        const barWidth = 300;
+                        const position = progress * barWidth;
+                        note.element.style.left = position + 'px';
+                    }
+                });
+            }
+            
+            updateHUD() {
+                document.getElementById('combo').textContent = this.gameState.combo + 'x';
+                document.getElementById('accuracy').textContent = this.gameState.accuracy + '%';
+                document.getElementById('current-grade').textContent = this.grades[this.gameState.grade].name;
+                document.getElementById('score').textContent = this.gameState.score;
+                document.getElementById('progress').textContent = 
+                    `${this.gameState.progress}/${this.grades[this.gameState.grade].targetCount}`;
+            }
+            
+            gameComplete() {
+                this.isPlaying = false;
+                this.saveGameStats();
+                
+                document.getElementById('menu').classList.remove('hidden');
+                document.getElementById('hud').classList.add('hidden');
+                document.getElementById('game-info').classList.add('hidden');
+                
+                document.querySelector('.menu-title').textContent = 'SPECIAL GRADE ACHIEVED!';
+                document.querySelector('.menu-btn').textContent = 'TRIAL AGAIN';
+            }
+            
+            async saveGameStats() {
+                try {
+                    const playtime = Math.floor((Date.now() - this.startTime) / 1000);
+                    const stats = {
+                        score: this.gameState.score,
+                        won: this.gameState.grade === 'special',
+                        playtime_seconds: playtime,
+                        extra: {
+                            final_grade: this.gameState.grade,
+                            max_combo: this.gameState.combo,
+                            accuracy: this.gameState.accuracy,
+                            total_hits: this.gameState.hits
+                        }
+                    };
+                    
+                    if (window.NexusDB) {
+                        await NexusDB.saveStats('grade-trials', stats);
+                    }
+                } catch (error) {
+                    console.error('Failed to save stats:', error);
+                }
+            }
+        }
+        
+        let game = null;
+        
+        async function startGame() {
+            document.getElementById('menu').classList.add('hidden');
+            document.getElementById('hud').classList.remove('hidden');
+            document.getElementById('game-info').classList.remove('hidden');
+            
+            if (!game) {
+                game = new GradeTrials3D();
+            }
+            
+            game.isPlaying = true;
+            game.startTime = Date.now();
+            game.lastBeat = Date.now();
+        }
+        
+        function showMultiplayer() {
+            window.location.href = '/multiplayer-lobby.html?game=grade-trials';
+        }
+        
+        function showGrades() {
+            alert('Grade System:\n4th Grade → 3rd Grade → 2nd Grade → 1st Grade → Special Grade\n\nHit the rhythm to progress!\nSpace, Z, X, C, V or Click to hit beats');
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,845 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>NEXUS — Multiplayer Lobby</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <script src="games/nexus-config.js"></script>
+  <script src="games/nexus-auth.js"></script>
+  <script src="games/nexus-cloud.js"></script>
+  <script src="games/nexus-db.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #06040f;
+      --card: #0f0b1a;
+      --card-hover: #161224;
+      --accent: #7c3aed;
+      --accent2: #06b6d4;
+      --text: #f1f5f9;
+      --muted: #64748b;
+      --border: rgba(124, 58, 237, 0.2);
+      --success: #22c55e;
+      --error: #ef4444;
+      --warning: #f59e0b;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      min-height: 100vh;
+      padding: 20px;
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    .header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 32px;
+      padding-bottom: 20px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .header-left {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .back-btn {
+      background: rgba(255,255,255,0.08);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px 16px;
+      color: var(--text);
+      text-decoration: none;
+      font-size: 14px;
+      font-weight: 600;
+      transition: all 0.2s ease;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .back-btn:hover {
+      background: rgba(124, 58, 237, 0.1);
+      border-color: var(--accent);
+    }
+
+    .game-info {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .game-icon {
+      width: 48px;
+      height: 48px;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 24px;
+      background: linear-gradient(135deg, var(--accent), #9d5cf6);
+    }
+
+    .game-details h1 {
+      font-size: 24px;
+      font-weight: 800;
+      color: var(--text);
+      margin-bottom: 4px;
+    }
+
+    .game-details p {
+      font-size: 14px;
+      color: var(--muted);
+    }
+
+    .user-info {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .user-avatar {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 16px;
+    }
+
+    .user-details {
+      text-align: right;
+    }
+
+    .user-name {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text);
+    }
+
+    .user-level {
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    .main-content {
+      display: grid;
+      grid-template-columns: 1fr 300px;
+      gap: 24px;
+    }
+
+    .rooms-section {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      overflow: hidden;
+    }
+
+    .section-header {
+      padding: 20px 24px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .section-title {
+      font-size: 18px;
+      font-weight: 700;
+      color: var(--text);
+    }
+
+    .create-room-btn {
+      background: linear-gradient(135deg, var(--accent), #9d5cf6);
+      border: none;
+      border-radius: 8px;
+      padding: 10px 20px;
+      color: #fff;
+      font-size: 14px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: opacity 0.2s ease;
+    }
+
+    .create-room-btn:hover {
+      opacity: 0.9;
+    }
+
+    .rooms-list {
+      padding: 16px 24px;
+      max-height: 500px;
+      overflow-y: auto;
+    }
+
+    .room-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 16px;
+      background: rgba(255,255,255,0.03);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      margin-bottom: 12px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .room-item:hover {
+      background: var(--card-hover);
+      border-color: var(--accent);
+    }
+
+    .room-info {
+      flex: 1;
+    }
+
+    .room-name {
+      font-size: 16px;
+      font-weight: 600;
+      color: var(--text);
+      margin-bottom: 4px;
+    }
+
+    .room-meta {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    .room-host {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .room-players {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .join-btn {
+      background: var(--accent);
+      border: none;
+      border-radius: 6px;
+      padding: 8px 16px;
+      color: #fff;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: opacity 0.2s ease;
+    }
+
+    .join-btn:hover {
+      opacity: 0.9;
+    }
+
+    .join-btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .sidebar {
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    .stats-panel {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 20px;
+    }
+
+    .stats-title {
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--text);
+      margin-bottom: 16px;
+    }
+
+    .stat-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 8px 0;
+      border-bottom: 1px solid rgba(255,255,255,0.05);
+    }
+
+    .stat-item:last-child {
+      border-bottom: none;
+    }
+
+    .stat-label {
+      font-size: 13px;
+      color: var(--muted);
+    }
+
+    .stat-value {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text);
+    }
+
+    .leaderboard-panel {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      overflow: hidden;
+    }
+
+    .leaderboard-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 20px;
+      border-bottom: 1px solid rgba(255,255,255,0.05);
+    }
+
+    .leaderboard-item:last-child {
+      border-bottom: none;
+    }
+
+    .rank {
+      width: 24px;
+      height: 24px;
+      border-radius: 4px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+      font-weight: 700;
+      background: rgba(255,255,255,0.1);
+      color: var(--muted);
+    }
+
+    .rank.gold {
+      background: rgba(245, 158, 11, 0.2);
+      color: #f59e0b;
+    }
+
+    .rank.silver {
+      background: rgba(148, 163, 184, 0.2);
+      color: #94a3b8;
+    }
+
+    .rank.bronze {
+      background: rgba(180, 107, 50, 0.2);
+      color: #b46b32;
+    }
+
+    .player-info {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .player-name {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .player-score {
+      font-size: 11px;
+      color: var(--muted);
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: 40px 20px;
+      color: var(--muted);
+    }
+
+    .empty-icon {
+      font-size: 48px;
+      margin-bottom: 16px;
+      opacity: 0.5;
+    }
+
+    .loading {
+      display: inline-block;
+      width: 20px;
+      height: 20px;
+      border: 2px solid rgba(124, 58, 237, 0.3);
+      border-radius: 50%;
+      border-top-color: var(--accent);
+      animation: spin 1s ease-in-out infinite;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    .modal {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.8);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.2s ease;
+    }
+
+    .modal.open {
+      opacity: 1;
+      pointer-events: all;
+    }
+
+    .modal-content {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 24px;
+      width: 400px;
+      max-width: 90vw;
+    }
+
+    .modal-header {
+      margin-bottom: 20px;
+    }
+
+    .modal-title {
+      font-size: 18px;
+      font-weight: 700;
+      color: var(--text);
+    }
+
+    .form-group {
+      margin-bottom: 16px;
+    }
+
+    .form-label {
+      display: block;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text);
+      margin-bottom: 6px;
+    }
+
+    .form-input {
+      width: 100%;
+      padding: 12px 16px;
+      background: rgba(255,255,255,0.05);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text);
+      font-size: 14px;
+      outline: none;
+      transition: border-color 0.2s ease;
+    }
+
+    .form-input:focus {
+      border-color: var(--accent);
+    }
+
+    .modal-actions {
+      display: flex;
+      gap: 12px;
+      justify-content: flex-end;
+    }
+
+    .btn-secondary {
+      background: rgba(255,255,255,0.08);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px 20px;
+      color: var(--text);
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .btn-secondary:hover {
+      background: rgba(255,255,255,0.12);
+    }
+
+    @media (max-width: 768px) {
+      .main-content {
+        grid-template-columns: 1fr;
+      }
+      
+      .header {
+        flex-direction: column;
+        gap: 16px;
+        align-items: flex-start;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <div class="header-left">
+        <a href="/" class="back-btn">
+          ← Back to Games
+        </a>
+        <div class="game-info">
+          <div class="game-icon" id="game-icon">🎮</div>
+          <div class="game-details">
+            <h1 id="game-name">Loading...</h1>
+            <p id="game-description">Multiplayer Lobby</p>
+          </div>
+        </div>
+      </div>
+      <div class="user-info">
+        <div class="user-avatar" id="user-avatar">?</div>
+        <div class="user-details">
+          <div class="user-name" id="user-name">Loading...</div>
+          <div class="user-level" id="user-level">Level ?</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="main-content">
+      <div class="rooms-section">
+        <div class="section-header">
+          <h2 class="section-title">Available Rooms</h2>
+          <button class="create-room-btn" id="create-room-btn">Create Room</button>
+        </div>
+        <div class="rooms-list" id="rooms-list">
+          <div class="loading" style="margin: 40px auto;"></div>
+        </div>
+      </div>
+
+      <div class="sidebar">
+        <div class="stats-panel">
+          <h3 class="stats-title">Your Stats</h3>
+          <div id="user-stats">
+            <div class="stat-item">
+              <span class="stat-label">Games Played</span>
+              <span class="stat-value" id="games-played">-</span>
+            </div>
+            <div class="stat-item">
+              <span class="stat-label">Best Score</span>
+              <span class="stat-value" id="best-score">-</span>
+            </div>
+            <div class="stat-item">
+              <span class="stat-label">Win Rate</span>
+              <span class="stat-value" id="win-rate">-</span>
+            </div>
+            <div class="stat-item">
+              <span class="stat-label">Total Playtime</span>
+              <span class="stat-value" id="total-playtime">-</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="leaderboard-panel">
+          <div class="section-header">
+            <h3 class="section-title">Leaderboard</h3>
+          </div>
+          <div id="leaderboard">
+            <div class="loading" style="margin: 20px auto;"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Create Room Modal -->
+  <div class="modal" id="create-room-modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 class="modal-title">Create New Room</h3>
+      </div>
+      <form id="create-room-form">
+        <div class="form-group">
+          <label class="form-label" for="room-name">Room Name</label>
+          <input type="text" id="room-name" class="form-input" placeholder="Enter room name" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="max-players">Max Players</label>
+          <select id="max-players" class="form-input">
+            <option value="2">2 Players</option>
+            <option value="4" selected>4 Players</option>
+            <option value="6">6 Players</option>
+            <option value="8">8 Players</option>
+          </select>
+        </div>
+        <div class="modal-actions">
+          <button type="button" class="btn-secondary" id="cancel-create">Cancel</button>
+          <button type="submit" class="create-room-btn">Create Room</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script>
+    let currentGameId = null;
+    let refreshInterval = null;
+
+    // Get game ID from URL
+    function getGameId() {
+      const params = new URLSearchParams(window.location.search);
+      return params.get('game') || 'hunters';
+    }
+
+    // Format time duration
+    function formatTime(seconds) {
+      const hours = Math.floor(seconds / 3600);
+      const minutes = Math.floor((seconds % 3600) / 60);
+      if (hours > 0) {
+        return `${hours}h ${minutes}m`;
+      }
+      return `${minutes}m`;
+    }
+
+    // Initialize game info
+    function initGameInfo() {
+      currentGameId = getGameId();
+      const gameConfig = window.NEXUS_GAMES?.[currentGameId];
+      
+      if (gameConfig) {
+        document.getElementById('game-name').textContent = gameConfig.name;
+        document.getElementById('game-icon').textContent = getGameIcon(currentGameId);
+      } else {
+        document.getElementById('game-name').textContent = currentGameId.toUpperCase();
+      }
+    }
+
+    // Get game icon
+    function getGameIcon(gameId) {
+      const icons = {
+        'hunters': '⚔️',
+        'cursed-arena': '🌀',
+        'domain-defender': '🏯',
+        'grade-trials': '🎵',
+        'spirit-chase': '👻',
+        'culling-colony': '💀'
+      };
+      return icons[gameId] || '🎮';
+    }
+
+    // Load user info
+    async function loadUserInfo() {
+      try {
+        const profile = await NexusAuth.getProfile();
+        if (profile) {
+          document.getElementById('user-name').textContent = profile.display_name;
+          document.getElementById('user-level').textContent = `Level ${profile.level}`;
+          document.getElementById('user-avatar').textContent = profile.display_name.charAt(0).toUpperCase();
+        }
+      } catch (error) {
+        console.error('Failed to load user info:', error);
+      }
+    }
+
+    // Load user stats
+    async function loadUserStats() {
+      try {
+        const stats = await NexusDB.getMyStats(currentGameId);
+        if (stats) {
+          document.getElementById('games-played').textContent = stats.gamesPlayed;
+          document.getElementById('best-score').textContent = stats.bestScore.toLocaleString();
+          document.getElementById('win-rate').textContent = stats.winRate + '%';
+          document.getElementById('total-playtime').textContent = formatTime(stats.totalPlaytime);
+        }
+      } catch (error) {
+        console.error('Failed to load user stats:', error);
+      }
+    }
+
+    // Load leaderboard
+    async function loadLeaderboard() {
+      try {
+        const leaderboard = await NexusDB.getLeaderboard(currentGameId, 5);
+        const container = document.getElementById('leaderboard');
+        
+        if (leaderboard.length === 0) {
+          container.innerHTML = `
+            <div class="empty-state">
+              <div class="empty-icon">🏆</div>
+              <p>No scores yet</p>
+            </div>
+          `;
+          return;
+        }
+
+        container.innerHTML = leaderboard.map((player, index) => {
+          let rankClass = '';
+          if (index === 0) rankClass = 'gold';
+          else if (index === 1) rankClass = 'silver';
+          else if (index === 2) rankClass = 'bronze';
+
+          return `
+            <div class="leaderboard-item">
+              <div class="rank ${rankClass}">${player.rank}</div>
+              <div class="player-info">
+                <div class="player-name">${player.displayName}</div>
+                <div class="player-score">${player.bestScore.toLocaleString()} pts</div>
+              </div>
+            </div>
+          `;
+        }).join('');
+      } catch (error) {
+        console.error('Failed to load leaderboard:', error);
+        document.getElementById('leaderboard').innerHTML = `
+          <div class="empty-state">
+            <p>Failed to load leaderboard</p>
+          </div>
+        `;
+      }
+    }
+
+    // Load rooms
+    async function loadRooms() {
+      try {
+        const rooms = await NexusCloud.listRooms(currentGameId);
+        const container = document.getElementById('rooms-list');
+        
+        if (rooms.length === 0) {
+          container.innerHTML = `
+            <div class="empty-state">
+              <div class="empty-icon">🎮</div>
+              <p>No rooms available</p>
+              <p style="font-size: 12px; margin-top: 8px;">Create a room to start playing!</p>
+            </div>
+          `;
+          return;
+        }
+
+        container.innerHTML = rooms.map(room => `
+          <div class="room-item" onclick="joinRoom('${room.id}')">
+            <div class="room-info">
+              <div class="room-name">${room.name}</div>
+              <div class="room-meta">
+                <div class="room-host">
+                  👤 ${room.host}
+                </div>
+                <div class="room-players">
+                  👥 ${room.playerCount}/${room.maxPlayers}
+                </div>
+              </div>
+            </div>
+            <button class="join-btn" ${room.playerCount >= room.maxPlayers ? 'disabled' : ''}>
+              ${room.playerCount >= room.maxPlayers ? 'Full' : 'Join'}
+            </button>
+          </div>
+        `).join('');
+      } catch (error) {
+        console.error('Failed to load rooms:', error);
+        document.getElementById('rooms-list').innerHTML = `
+          <div class="empty-state">
+            <p>Failed to load rooms</p>
+          </div>
+        `;
+      }
+    }
+
+    // Join room
+    async function joinRoom(roomId) {
+      try {
+        const result = await NexusCloud.joinRoom(roomId);
+        
+        // Redirect to game with room parameter
+        const gameConfig = window.NEXUS_GAMES?.[currentGameId];
+        if (gameConfig) {
+          window.location.href = `${gameConfig.path}?room=${roomId}`;
+        }
+      } catch (error) {
+        console.error('Failed to join room:', error);
+        alert('Failed to join room: ' + error.message);
+      }
+    }
+
+    // Create room
+    async function createRoom(name, maxPlayers) {
+      try {
+        const result = await NexusCloud.createRoom(currentGameId, name, maxPlayers);
+        
+        // Redirect to game with room parameter
+        const gameConfig = window.NEXUS_GAMES?.[currentGameId];
+        if (gameConfig) {
+          window.location.href = `${gameConfig.path}?room=${result.roomId}`;
+        }
+      } catch (error) {
+        console.error('Failed to create room:', error);
+        alert('Failed to create room: ' + error.message);
+      }
+    }
+
+    // Modal handling
+    function openModal(modalId) {
+      document.getElementById(modalId).classList.add('open');
+    }
+
+    function closeModal(modalId) {
+      document.getElementById(modalId).classList.remove('open');
+    }
+
+    // Initialize page
+    document.addEventListener('DOMContentLoaded', async () => {
+      // Check authentication
+      const isAuthenticated = await NexusAuth.requireAuth();
+      if (!isAuthenticated) return;
+
+      // Initialize
+      initGameInfo();
+      await loadUserInfo();
+      await loadUserStats();
+      await loadLeaderboard();
+      await loadRooms();
+
+      // Set up auto-refresh
+      refreshInterval = setInterval(loadRooms, 5000);
+
+      // Event listeners
+      document.getElementById('create-room-btn').addEventListener('click', () => {
+        openModal('create-room-modal');
+      });
+
+      document.getElementById('cancel-create').addEventListener('click', () => {
+        closeModal('create-room-modal');
+      });
+
+      document.getElementById('create-room-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        
+        const name = document.getElementById('room-name').value;
+        const maxPlayers = parseInt(document.getElementById('max-players').value);
+        
+        closeModal('create-room-modal');
+        await createRoom(name, maxPlayers);
+      });
+
+      // Close modal on outside click
+      document.getElementById('create-room-modal').addEventListener('click', (e) => {
+        if (e.target === e.currentTarget) {
+          closeModal('create-room-modal');
+        }
+      });
+    });
+
+    // Cleanup on page unload
+    window.addEventListener('beforeunload', () => {
+      if (refreshInterval) {
+        clearInterval(refreshInterval);
+      }
+    });
+  </script>
+</body>
+</html>

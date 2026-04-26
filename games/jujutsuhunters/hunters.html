@@ -2588,7 +2588,10 @@
     }
     </script>
 <script src="../nexus-config.js"></script>
-<script src="../nexus-mp.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="../nexus-auth.js"></script>
+<script src="../nexus-cloud.js"></script>
+<script src="../nexus-db.js"></script>
 <script>
 // ── HUNTERS MULTIPLAYER — Firebase Lobby + Railway WebSocket ──────────────────
 (function(){
@@ -2645,8 +2648,8 @@
   function updatePlayerList() {
     const el = document.getElementById('mp-players');
     let html = '';
-    NexusMP.players.forEach((p, id) => {
-      const isMe = id === NexusMP.myId;
+    NexusCloud.players.forEach((p, id) => {
+      const isMe = id === (NexusAuth.getProfile()?.id);
       html += `<div class="mp-player-row"><div class="mp-dot${isMe?'':' opp'}"></div>${p.name}${isMe?' (you)':''}</div>`;
     });
     el.innerHTML = html;
@@ -2656,7 +2659,7 @@
     const el = document.getElementById('mp-scores');
     if (!el) return;
     let html = '<div style="font-size:.62rem;font-weight:700;letter-spacing:.1em;color:#94a3b8;margin-bottom:4px;">LIVE SCORES</div>';
-    NexusMP.players.forEach((p) => {
+    NexusCloud.players.forEach((p) => {
       html += `<div class="mp-score-row">${p.name}: <span>${p.kills||0} kills · ${p.score||0} pts</span></div>`;
     });
     el.innerHTML = html;
@@ -2664,39 +2667,46 @@
 
   function onConnected() {
     updatePlayerList();
-    NexusMP.on('scores', (data) => {
+    NexusCloud.on('scores', (data) => {
       if (!data || !data.id) return;
-      const p = NexusMP.players.get(data.id);
+      const p = NexusCloud.players.get(data.id);
       if (p) Object.assign(p, data);
       updateScores();
     });
-    NexusMP.onPlayerJoin((id, p) => {
+    NexusCloud.onPlayerJoin((id, p) => {
       updatePlayerList();
       setStatus(`${p.name} joined!`, '#10b981');
-      if (RAILWAY_URL && window.MultiplayerClient) {
-        window.MultiplayerClient.connect(RAILWAY_URL, localStorage.getItem('nexus_playername') || 'Hunter');
-      }
     });
-    NexusMP.onPlayerLeave(() => updatePlayerList());
+    NexusCloud.onPlayerLeave(() => updatePlayerList());
+    
     setInterval(() => {
-      if (!NexusMP.myId) return;
+      const profile = NexusAuth.getProfile();
+      if (!profile) return;
       const kills = window.G && window.G.kills ? window.G.kills : 0;
       const score = window.G && window.G.score ? window.G.score : 0;
-      NexusMP.send('scores', { id: NexusMP.myId, kills, score, name: localStorage.getItem('nexus_playername') || 'Hunter' });
+      NexusCloud.send('scores', { id: profile.id, kills, score, name: profile.display_name });
       updateScores();
     }, 2000);
   }
 
   async function createRoom() {
-    const name = document.getElementById('mp-name').value.trim() || 'Hunter';
-    localStorage.setItem('nexus_playername', name);
-    setStatus('Creating room…', '#7c3aed');
     try {
-      const { roomCode } = await NexusMP.init(GAME_ID, name);
-      setStatus('Room created! Share the code.', '#10b981');
+      // Ensure user is authenticated
+      const isAuth = await NexusAuth.requireAuth();
+      if (!isAuth) return;
+      
+      const profile = await NexusAuth.getProfile();
+      const roomName = `${profile.display_name}'s Room`;
+      
+      setStatus('Creating room…', '#7c3aed');
+      const { roomId, roomCode } = await NexusCloud.createRoom(GAME_ID, roomName, 4);
+      setStatus('Room created! Players can join.', '#10b981');
       showCode(roomCode);
       onConnected();
-    } catch(e) { setStatus('Error: ' + e.message, '#ef4444'); }
+    } catch(e) { 
+      console.error('Create room error:', e);
+      setStatus('Error: ' + e.message, '#ef4444'); 
+    }
   }
 
   function showCode(code) {
@@ -2708,20 +2718,116 @@
   }
 
   async function joinRoom() {
-    const name = document.getElementById('mp-name').value.trim() || 'Hunter';
-    const code = document.getElementById('mp-code-input').value.trim().toUpperCase();
-    if (!code) { setStatus('Enter a room code', '#ef4444'); return; }
-    localStorage.setItem('nexus_playername', name);
-    setStatus('Joining…', '#7c3aed');
     try {
-      await NexusMP.join(GAME_ID, code, name);
+      // Ensure user is authenticated
+      const isAuth = await NexusAuth.requireAuth();
+      if (!isAuth) return;
+      
+      const code = document.getElementById('mp-code-input').value.trim().toUpperCase();
+      if (!code) { setStatus('Enter a room code', '#ef4444'); return; }
+      
+      setStatus('Joining…', '#7c3aed');
+      
+      // For now, we'll need to implement room code to room ID mapping
+      // This is a simplified version - in production you'd want a proper lookup
+      const rooms = await NexusCloud.listRooms(GAME_ID);
+      const room = rooms.find(r => r.id.split('-')[0].toUpperCase() === code);
+      
+      if (!room) {
+        setStatus('Room not found', '#ef4444');
+        return;
+      }
+      
+      await NexusCloud.joinRoom(room.id);
       setStatus('Connected!', '#10b981');
       onConnected();
-    } catch(e) { setStatus('Error: ' + e.message, '#ef4444'); }
+    } catch(e) { 
+      console.error('Join room error:', e);
+      setStatus('Error: ' + e.message, '#ef4444'); 
+    }
+  }
+
+  // Check for room parameter in URL (from lobby)
+  async function checkRoomParam() {
+    const params = new URLSearchParams(window.location.search);
+    const roomId = params.get('room');
+    
+    if (roomId) {
+      try {
+        const isAuth = await NexusAuth.requireAuth();
+        if (!isAuth) return;
+        
+        setStatus('Joining room…', '#7c3aed');
+        await NexusCloud.joinRoom(roomId);
+        setStatus('Connected!', '#10b981');
+        onConnected();
+        
+        // Show multiplayer panel
+        document.getElementById('mp-box').classList.add('open');
+      } catch (error) {
+        console.error('Auto-join error:', error);
+        setStatus('Failed to join room', '#ef4444');
+      }
+    }
   }
 
   document.getElementById('mp-host-btn').onclick = createRoom;
   document.getElementById('mp-join-btn').onclick = joinRoom;
+  
+  // Initialize
+  document.addEventListener('DOMContentLoaded', () => {
+    checkRoomParam();
+  });
+
+  // Game stats saving functionality
+  async function saveGameStats(gameData) {
+    try {
+      const isAuth = await NexusAuth.getUser();
+      if (!isAuth) return; // Don't save stats for unauthenticated users
+      
+      const stats = {
+        score: gameData.score || 0,
+        won: gameData.won || false,
+        playtime_seconds: gameData.playtime || 0,
+        extra: {
+          kills: gameData.kills || 0,
+          deaths: gameData.deaths || 0,
+          accuracy: gameData.accuracy || 0,
+          technique_used: gameData.technique || null,
+          difficulty: gameData.difficulty || 'normal'
+        }
+      };
+      
+      await NexusDB.saveStats(GAME_ID, stats);
+      console.log('[HUNTERS] Game stats saved:', stats);
+    } catch (error) {
+      console.error('[HUNTERS] Failed to save game stats:', error);
+    }
+  }
+
+  // Hook into game end events
+  window.addEventListener('load', () => {
+    // Override the game's showScreen function to detect game over
+    if (window.G && window.G.showScreen) {
+      const originalShowScreen = window.G.showScreen;
+      window.G.showScreen = function(screenId) {
+        if (screenId === 's-over') {
+          // Game over detected, save stats
+          const gameData = {
+            score: window.G.score || 0,
+            kills: window.G.kills || 0,
+            deaths: window.G.deaths || 0,
+            won: (window.G.score || 0) > 0, // Simple win condition
+            playtime: window.G.playtime || 0,
+            accuracy: window.G.accuracy || 0,
+            technique: window.G.selectedTechnique || null
+          };
+          saveGameStats(gameData);
+        }
+        return originalShowScreen.call(this, screenId);
+      };
+    }
+  });
 })();
 </script>
 <script>(function(){
