@@ -18,5 +18,7 @@ window.NEXUS_GAMES = {
   'domain-defender': { name: 'Domain Defender', path: 'games/domain-defender/index.html' },
   'grade-trials': { name: 'Grade Trials', path: 'games/grade-trials/index.html' },
   'spirit-chase': { name: 'Spirit Chase', path: 'games/spirit-chase/index.html' },
-  'culling-colony': { name: 'Culling Colony', path: 'games/culling-colony/index.html' }
+  'culling-colony': { name: 'Culling Colony', path: 'games/culling-colony/index.html' },
+  'technique-duel': { name: 'Technique Duel', path: 'games/technique-duel/index.html' },
+  'energy-clicker': { name: 'Energy Clicker', path: 'games/energy-clicker/index.html' }
 };

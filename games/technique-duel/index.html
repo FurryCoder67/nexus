@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Technique Duel — NEXUS</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+    <script src="/games/nexus-config.js"></script>
+    <script src="/games/nexus-auth.js"></script>
+    <script src="/games/nexus-db.js"></script>
+    <script src="/games/nexus-cloud.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: linear-gradient(135deg, #0d0820 0%, #1a0a35 50%, #06142a 100%);
+            color: #f1f5f9;
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+        }
+
+        .game-container {
+            text-align: center;
+            max-width: 800px;
+            padding: 40px;
+        }
+
+        .title {
+            font-size: 48px;
+            font-weight: 900;
+            margin-bottom: 20px;
+            text-shadow: 0 0 30px rgba(124, 58, 237, 0.8);
+            letter-spacing: 2px;
+        }
+
+        .subtitle {
+            font-size: 18px;
+            color: #94a3b8;
+            margin-bottom: 40px;
+        }
+
+        .techniques {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 20px;
+            margin-bottom: 40px;
+        }
+
+        .technique-btn {
+            background: rgba(124, 58, 237, 0.2);
+            border: 2px solid rgba(124, 58, 237, 0.4);
+            border-radius: 12px;
+            padding: 30px 20px;
+            color: #f1f5f9;
+            font-size: 16px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .technique-btn:hover {
+            background: rgba(124, 58, 237, 0.4);
+            border-color: #7c3aed;
+            transform: translateY(-5px);
+            box-shadow: 0 10px 30px rgba(124, 58, 237, 0.5);
+        }
+
+        .technique-btn:active {
+            transform: translateY(-2px);
+        }
+
+        .technique-icon {
+            font-size: 48px;
+            margin-bottom: 10px;
+            display: block;
+        }
+
+        .score-board {
+            display: flex;
+            justify-content: space-around;
+            margin-bottom: 30px;
+            padding: 20px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 12px;
+            border: 1px solid rgba(124, 58, 237, 0.3);
+        }
+
+        .score-item {
+            text-align: center;
+        }
+
+        .score-label {
+            font-size: 12px;
+            color: #94a3b8;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 5px;
+        }
+
+        .score-value {
+            font-size: 32px;
+            font-weight: 900;
+            color: #7c3aed;
+        }
+
+        .result {
+            font-size: 24px;
+            font-weight: 700;
+            margin-bottom: 20px;
+            min-height: 30px;
+            animation: fadeIn 0.5s ease;
+        }
+
+        .result.win {
+            color: #22c55e;
+        }
+
+        .result.lose {
+            color: #ef4444;
+        }
+
+        .result.draw {
+            color: #f59e0b;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .back-btn {
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 8px;
+            padding: 12px 24px;
+            color: #f1f5f9;
+            text-decoration: none;
+            font-size: 14px;
+            font-weight: 600;
+            display: inline-block;
+            transition: all 0.2s ease;
+        }
+
+        .back-btn:hover {
+            background: rgba(255, 255, 255, 0.15);
+            border-color: #7c3aed;
+        }
+
+        .rate-game {
+            margin-top: 30px;
+            padding: 20px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 12px;
+            border: 1px solid rgba(124, 58, 237, 0.3);
+        }
+
+        .stars {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin: 15px 0;
+        }
+
+        .star {
+            font-size: 32px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            filter: grayscale(100%);
+        }
+
+        .star:hover,
+        .star.active {
+            filter: grayscale(0%);
+            transform: scale(1.2);
+        }
+    </style>
+</head>
+
+<body>
+    <div class="game-container">
+        <h1 class="title">⚡ TECHNIQUE DUEL</h1>
+        <p class="subtitle">Choose your technique wisely!</p>
+
+        <div class="score-board">
+            <div class="score-item">
+                <div class="score-label">Your Score</div>
+                <div class="score-value" id="player-score">0</div>
+            </div>
+            <div class="score-item">
+                <div class="score-label">Opponent Score</div>
+                <div class="score-value" id="opponent-score">0</div>
+            </div>
+            <div class="score-item">
+                <div class="score-label">Round</div>
+                <div class="score-value" id="round">1</div>
+            </div>
+        </div>
+
+        <div class="result" id="result"></div>
+
+        <div class="techniques">
+            <button class="technique-btn" onclick="playTechnique('domain')">
+                <span class="technique-icon">🏯</span>
+                Domain Expansion
+            </button>
+            <button class="technique-btn" onclick="playTechnique('cursed')">
+                <span class="technique-icon">⚡</span>
+                Cursed Technique
+            </button>
+            <button class="technique-btn" onclick="playTechnique('reverse')">
+                <span class="technique-icon">💚</span>
+                Reverse Cursed
+            </button>
+        </div>
+
+        <div class="rate-game">
+            <div class="score-label">Rate This Game</div>
+            <div class="stars" id="stars">
+                <span class="star" onclick="rateGame(1)">⭐</span>
+                <span class="star" onclick="rateGame(2)">⭐</span>
+                <span class="star" onclick="rateGame(3)">⭐</span>
+                <span class="star" onclick="rateGame(4)">⭐</span>
+                <span class="star" onclick="rateGame(5)">⭐</span>
+            </div>
+            <div id="rating-message" style="color: #22c55e; font-size: 14px; margin-top: 10px;"></div>
+        </div>
+
+        <a href="/" class="back-btn">← Back to NEXUS</a>
+    </div>
+
+    <script>
+        // Game state
+        let playerScore = 0;
+        let opponentScore = 0;
+        let round = 1;
+        let gameStartTime = Date.now();
+        let totalScore = 0;
+
+        // Technique matchups (what beats what)
+        const matchups = {
+            'domain': 'cursed',      // Domain beats Cursed
+            'cursed': 'reverse',     // Cursed beats Reverse
+            'reverse': 'domain'      // Reverse beats Domain
+        };
+
+        async function playTechnique(playerChoice) {
+            // Disable buttons during round
+            const buttons = document.querySelectorAll('.technique-btn');
+            buttons.forEach(btn => btn.style.pointerEvents = 'none');
+
+            // Opponent chooses randomly
+            const choices = ['domain', 'cursed', 'reverse'];
+            const opponentChoice = choices[Math.floor(Math.random() * choices.length)];
+
+            // Determine winner
+            let result = '';
+            if (playerChoice === opponentChoice) {
+                result = 'draw';
+                document.getElementById('result').textContent = '⚖️ Draw!';
+                document.getElementById('result').className = 'result draw';
+            } else if (matchups[playerChoice] === opponentChoice) {
+                result = 'win';
+                playerScore++;
+                totalScore += 100;
+                document.getElementById('result').textContent = '🎉 You Win This Round!';
+                document.getElementById('result').className = 'result win';
+            } else {
+                result = 'lose';
+                opponentScore++;
+                document.getElementById('result').textContent = '💀 You Lose This Round!';
+                document.getElementById('result').className = 'result lose';
+            }
+
+            // Update display
+            document.getElementById('player-score').textContent = playerScore;
+            document.getElementById('opponent-score').textContent = opponentScore;
+
+            // Next round
+            round++;
+            document.getElementById('round').textContent = round;
+
+            // Check if game over (best of 5)
+            if (round > 5) {
+                await endGame();
+            } else {
+                // Re-enable buttons after delay
+                setTimeout(() => {
+                    buttons.forEach(btn => btn.style.pointerEvents = 'auto');
+                }, 1500);
+            }
+        }
+
+        async function endGame() {
+            const won = playerScore > opponentScore;
+            const playtime = Math.floor((Date.now() - gameStartTime) / 1000);
+
+            // Show final result
+            if (won) {
+                document.getElementById('result').textContent = '🏆 YOU WON THE DUEL!';
+                document.getElementById('result').className = 'result win';
+                totalScore += 500; // Bonus for winning
+            } else if (playerScore < opponentScore) {
+                document.getElementById('result').textContent = '💀 YOU LOST THE DUEL!';
+                document.getElementById('result').className = 'result lose';
+            } else {
+                document.getElementById('result').textContent = '⚖️ DRAW!';
+                document.getElementById('result').className = 'result draw';
+            }
+
+            // Save stats to database
+            try {
+                await NexusDB.saveStats('technique-duel', {
+                    score: totalScore,
+                    won: won,
+                    playtime_seconds: playtime,
+                    extra: {
+                        rounds_won: playerScore,
+                        rounds_lost: opponentScore
+                    }
+                });
+                console.log('Stats saved successfully!');
+            } catch (error) {
+                console.error('Failed to save stats:', error);
+            }
+
+            // Disable all buttons
+            document.querySelectorAll('.technique-btn').forEach(btn => {
+                btn.style.pointerEvents = 'none';
+                btn.style.opacity = '0.5';
+            });
+
+            // Show play again option
+            setTimeout(() => {
+                if (confirm('Play again?')) {
+                    location.reload();
+                }
+            }, 2000);
+        }
+
+        async function rateGame(rating) {
+            try {
+                await NexusRatings.rateGame('technique-duel', rating);
+
+                // Update star display
+                const stars = document.querySelectorAll('.star');
+                stars.forEach((star, index) => {
+                    if (index < rating) {
+                        star.classList.add('active');
+                    } else {
+                        star.classList.remove('active');
+                    }
+                });
+
+                document.getElementById('rating-message').textContent = `Thanks for rating! You gave ${rating} stars.`;
+
+                // Disable further rating
+                stars.forEach(star => star.style.pointerEvents = 'none');
+            } catch (error) {
+                console.error('Failed to rate game:', error);
+                document.getElementById('rating-message').textContent = 'Please sign in to rate games.';
+                document.getElementById('rating-message').style.color = '#ef4444';
+            }
+        }
+
+        // Load existing rating
+        document.addEventListener('DOMContentLoaded', async () => {
+            try {
+                const user = await NexusAuth.getUser();
+                if (user) {
+                    const myRating = await NexusRatings.getMyRating('technique-duel');
+                    if (myRating) {
+                        const stars = document.querySelectorAll('.star');
+                        stars.forEach((star, index) => {
+                            if (index < myRating.rating) {
+                                star.classList.add('active');
+                            }
+                            star.style.pointerEvents = 'none';
+                        });
+                        document.getElementById('rating-message').textContent = `You rated this ${myRating.rating} stars.`;
+                    }
+                }
+            } catch (error) {
+                console.log('Not signed in or error loading rating');
+            }
+        });
+    </script>
+    <script src="/games/nexus-ratings.js"></script>
+</body>
+
+</html>

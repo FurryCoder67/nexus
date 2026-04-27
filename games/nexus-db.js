@@ -3,7 +3,7 @@
 // Handles game statistics, player profiles, and leaderboard queries
 // =============================================================================
 
-(function() {
+(function () {
   'use strict';
 
   // Ensure dependencies are loaded
@@ -19,7 +19,7 @@
 
   // Initialize Supabase client
   let _supabase = null;
-  
+
   function getSupabase() {
     if (!_supabase) {
       if (!window.NEXUS_SUPABASE_URL || !window.NEXUS_SUPABASE_ANON_KEY) {
@@ -39,9 +39,9 @@
     async saveStats(gameId, stats) {
       const user = await NexusAuth.getUser();
       if (!user) throw new Error('Must be authenticated to save stats');
-      
+
       const sb = getSupabase();
-      
+
       // Prepare stats data
       const statsData = {
         player_id: user.id,
@@ -51,75 +51,78 @@
         playtime_seconds: stats.playtime_seconds || 0,
         extra: stats.extra || {}
       };
-      
+
       // Insert stats
       const { data, error } = await sb
         .from('game_stats')
         .insert(statsData)
         .select()
         .single();
-      
+
       if (error) throw error;
-      
+
       // Update player XP based on performance
       await this._updatePlayerXP(user.id, stats);
-      
+
       return data;
     },
 
     // Update player XP and level
     async _updatePlayerXP(playerId, stats) {
       const sb = getSupabase();
-      
+
       // Calculate XP gain
       let xpGain = Math.floor(stats.score / 10); // Base XP from score
       if (stats.won) xpGain += 100; // Bonus for winning
       xpGain += Math.floor(stats.playtime_seconds / 60) * 5; // Time bonus
-      
+
       // Get current profile
       const { data: profile, error: profileError } = await sb
         .from('profiles')
         .select('xp, level')
         .eq('id', playerId)
         .single();
-      
+
       if (profileError) throw profileError;
-      
+
       const newXP = profile.xp + xpGain;
       const newLevel = Math.floor(Math.sqrt(newXP / 100)) + 1; // Level formula
-      
+
       // Update profile
       const { error: updateError } = await sb
         .from('profiles')
-        .update({ 
-          xp: newXP, 
-          level: newLevel 
+        .update({
+          xp: newXP,
+          level: newLevel
         })
         .eq('id', playerId);
-      
+
       if (updateError) throw updateError;
-      
+
       return { xpGain, newXP, newLevel };
     },
 
     // Get leaderboard for a specific game
     async getLeaderboard(gameId, limit = 10) {
       const sb = getSupabase();
-      
-      let query = sb
+
+      if (!gameId) {
+        return this.getGlobalLeaderboard(limit);
+      }
+
+      const { data, error } = await sb
         .from('leaderboards')
         .select('*')
+        .eq('game_id', gameId)
         .order('rank', { ascending: true })
         .limit(limit);
-      
-      if (gameId) {
-        query = query.eq('game_id', gameId);
-      }
-      
-      const { data, error } = await query;
-      
+
       if (error) throw error;
-      
+
+      if (!data || data.length === 0) {
+        return [];
+      }
+
       return data.map((entry, index) => ({
         rank: entry.rank || index + 1,
         playerId: entry.player_id,
@@ -136,15 +139,15 @@
     // Get global leaderboard
     async getGlobalLeaderboard(limit = 10) {
       const sb = getSupabase();
-      
+
       const { data, error } = await sb
         .from('global_leaderboard')
         .select('*')
         .order('rank', { ascending: true })
         .limit(limit);
-      
+
       if (error) throw error;
-      
+
       return data.map((entry, index) => ({
         rank: entry.rank || index + 1,
         playerId: entry.player_id,
@@ -163,18 +166,18 @@
     async getMyStats(gameId) {
       const user = await NexusAuth.getUser();
       if (!user) return null;
-      
+
       const sb = getSupabase();
-      
+
       const { data, error } = await sb
         .from('game_stats')
         .select('*')
         .eq('player_id', user.id)
         .eq('game_id', gameId)
         .order('recorded_at', { ascending: false });
-      
+
       if (error) throw error;
-      
+
       if (data.length === 0) {
         return {
           gamesPlayed: 0,
@@ -186,13 +189,13 @@
           recentGames: []
         };
       }
-      
+
       const totalGames = data.length;
       const totalWins = data.filter(game => game.won).length;
       const bestScore = Math.max(...data.map(game => game.score));
       const totalPlaytime = data.reduce((sum, game) => sum + game.playtime_seconds, 0);
       const averageScore = data.reduce((sum, game) => sum + game.score, 0) / totalGames;
-      
+
       return {
         gamesPlayed: totalGames,
         bestScore,
@@ -214,7 +217,7 @@
     async getProfile() {
       const user = await NexusAuth.getUser();
       if (!user) return null;
-      
+
       return NexusAuth.getProfile();
     },
 
@@ -226,7 +229,7 @@
     // Get player activity feed
     async getActivityFeed(limit = 20) {
       const sb = getSupabase();
-      
+
       const { data, error } = await sb
         .from('game_stats')
         .select(`
@@ -235,9 +238,9 @@
         `)
         .order('recorded_at', { ascending: false })
         .limit(limit);
-      
+
       if (error) throw error;
-      
+
       return data.map(activity => ({
         id: activity.id,
         playerId: activity.player_id,
@@ -256,14 +259,14 @@
     // Get game statistics summary
     async getGameStats(gameId) {
       const sb = getSupabase();
-      
+
       const { data, error } = await sb
         .from('game_stats')
         .select('*')
         .eq('game_id', gameId);
-      
+
       if (error) throw error;
-      
+
       if (data.length === 0) {
         return {
           totalGames: 0,
@@ -273,13 +276,13 @@
           totalPlaytime: 0
         };
       }
-      
+
       const uniquePlayers = new Set(data.map(game => game.player_id)).size;
       const totalGames = data.length;
       const averageScore = data.reduce((sum, game) => sum + game.score, 0) / totalGames;
       const highestScore = Math.max(...data.map(game => game.score));
       const totalPlaytime = data.reduce((sum, game) => sum + game.playtime_seconds, 0);
-      
+
       return {
         totalGames,
         totalPlayers: uniquePlayers,
@@ -292,46 +295,46 @@
     // Search players
     async searchPlayers(query, limit = 10) {
       const sb = getSupabase();
-      
+
       const { data, error } = await sb
         .from('profiles')
         .select('id, username, display_name, avatar_url, xp, level')
         .or(`username.ilike.%${query}%,display_name.ilike.%${query}%`)
         .order('xp', { ascending: false })
         .limit(limit);
-      
+
       if (error) throw error;
-      
+
       return data;
     },
 
     // Get trending games
     async getTrendingGames() {
       const sb = getSupabase();
-      
+
       // Get games played in the last 24 hours
       const { data, error } = await sb
         .from('game_stats')
         .select('game_id')
         .gte('recorded_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString());
-      
+
       if (error) throw error;
-      
+
       // Count games by game_id
       const gameCounts = {};
       data.forEach(stat => {
         gameCounts[stat.game_id] = (gameCounts[stat.game_id] || 0) + 1;
       });
-      
+
       // Sort by popularity
       const trending = Object.entries(gameCounts)
-        .sort(([,a], [,b]) => b - a)
+        .sort(([, a], [, b]) => b - a)
         .map(([gameId, count]) => ({
           gameId,
           name: window.NEXUS_GAMES?.[gameId]?.name || gameId,
           playCount: count
         }));
-      
+
       return trending;
     }
   };
